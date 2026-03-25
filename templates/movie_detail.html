@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ movie.title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>{{ movie.title }}</h1>
+
+        <div class="detail-card">
+            {% if movie.poster_path %}
+                <img src="{{ image_base_url }}{{ movie.poster_path }}" alt="포스터">
+            {% endif %}
+
+            <div class="movie-info">
+                <p>원제: {{ movie.original_title }}</p>
+                <p>개봉일: {{ movie.release_date }}</p>
+                <p>평점: {{ movie.vote_average }}</p>
+                <p>줄거리: {{ movie.overview }}</p>
+            </div>
+        </div>
+
+        <a href="/movie-search" class="back-link">검색으로 돌아가기</a>
+    </div>
+</body>
+</html>
