@@ -2,15 +2,79 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>방구석 평론가</title>
+    <title>메인</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>영화 검색 시스템</h1>
-        <a href="/movie-search">
-            <button>영화 검색하기</button>
-        </a>
+    <div class="window-frame">
+        <div class="window-bar"></div>
+
+        <div class="app-shell">
+            <header class="top-header">
+                <div class="brand">방구석 평론가</div>
+                <div class="header-right">
+                    <form action="/search" method="get" class="header-search">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" name="q" placeholder="영화를 검색하세요...">
+                    </form>
+                    <div class="nickname">{{ nickname }}</div>
+                </div>
+            </header>
+
+            <main class="page-content">
+                <section class="section-block">
+                    <div class="section-title-row">
+                        <h2>인기 영화</h2>
+                    </div>
+                    <div class="movie-grid five">
+                        {% for movie in popular_movies %}
+                        <a href="/movie/{{ movie.id }}" class="movie-card simple">
+                            <div class="poster-box">
+                                {% if movie.poster_path %}
+                                <img src="{{ image_base_url }}{{ movie.poster_path }}" alt="포스터">
+                                {% else %}
+                                <span>포스터</span>
+                                {% endif %}
+                            </div>
+                            <div class="movie-card-body">
+                                <div class="movie-card-title">{{ movie.title }}</div>
+                                <div class="freshness-badge">신선도 {{ movie.freshness }}</div>
+                                <div class="movie-card-meta">{{ movie.genre }}</div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <section class="section-block">
+                    <div class="section-title-row">
+                        <h2>즐겨찾기</h2>
+                    </div>
+                    <div class="movie-grid four">
+                        {% for movie in favorite_movies %}
+                        <a href="/movie/{{ movie.id }}" class="movie-card simple favorite-card">
+                            <div class="heart-mark">♥</div>
+                            <div class="poster-box">
+                                {% if movie.poster_path %}
+                                <img src="{{ image_base_url }}{{ movie.poster_path }}" alt="포스터">
+                                {% else %}
+                                <span>포스터</span>
+                                {% endif %}
+                            </div>
+                            <div class="movie-card-body">
+                                <div class="movie-card-title">{{ movie.title }}</div>
+                                <div class="freshness-badge">신선도 {{ movie.freshness }}</div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+
+                    <div class="bottom-link-row">
+                        <a href="/my-reviews" class="wide-link-button">내가 작성한 리뷰 보기 →</a>
+                    </div>
+                </section>
+            </main>
+        </div>
     </div>
 </body>
 </html>

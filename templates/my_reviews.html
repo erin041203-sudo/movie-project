@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>내가 작성한 리뷰</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="simple-page">
+        <div class="simple-header">
+            <div class="brand">방구석 평론가</div>
+            <div class="nickname">{{ nickname }}</div>
+        </div>
+
+        <div class="simple-content">
+            <a href="/main" class="back-link">← 돌아가기</a>
+            <h1 class="simple-title">내가 작성한 리뷰</h1>
+
+            {% for review in reviews %}
+            <div class="simple-review-card">
+                <div class="simple-review-poster">포스터</div>
+
+                <div class="simple-review-body">
+                    <div class="simple-review-movie">{{ review.title }}</div>
+
+                    {% if review.editing %}
+                    <textarea class="simple-edit-textarea">{{ review.content }}</textarea>
+                    <div class="simple-review-buttons">
+                        <a href="/my-reviews" class="btn btn-primary small-btn">저장</a>
+                        <a href="/my-reviews" class="btn btn-secondary small-btn">취소</a>
+                    </div>
+                    {% else %}
+                    <p class="simple-review-text">{{ review.content }}</p>
+                    <div class="simple-review-date">📅 {{ review.date }}</div>
+                    {% endif %}
+                </div>
+
+                {% if not review.editing %}
+                <div class="simple-review-actions">
+                    <a href="/my-reviews?mode=edit&edit_id={{ review.id }}" class="btn-outline">수정</a>
+                    <a href="/my-reviews?mode=delete&delete_id={{ review.id }}" class="btn-outline danger">삭제</a>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if delete_review %}
+        <div class="simple-modal-overlay">
+            <div class="simple-modal">
+                <h3>리뷰를 삭제하시겠습니까?</h3>
+                <p>삭제된 리뷰는 복구할 수 없습니다.<br>정말 삭제하시겠습니까?</p>
+
+                <div class="simple-delete-preview">
+                    <strong>{{ delete_review.title }}</strong>
+                    <div>{{ delete_review.content }}</div>
+                </div>
+
+                <div class="simple-modal-actions">
+                    <a href="/my-reviews" class="btn btn-danger">삭제</a>
+                    <a href="/my-reviews" class="btn btn-secondary">취소</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

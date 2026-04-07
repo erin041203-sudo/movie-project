@@ -6,29 +6,53 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>검색 결과</h1>
+    <div class="window-frame">
+        <div class="window-bar"></div>
 
-        <div class="movie-list">
-            {% for movie in results %}
-                <div class="movie-card">
-                    <a href="/movie/{{ movie.id }}" class="movie-title">
-                        {{ movie.title }}
-                    </a>
-
-                    {% if movie.poster_path %}
-                        <img src="{{ image_base_url }}{{ movie.poster_path }}" alt="포스터">
-                    {% endif %}
-
-                    <div class="movie-info">
-                        개봉일: {{ movie.release_date }}<br>
-                        평점: {{ movie.vote_average }}
-                    </div>
+        <div class="app-shell">
+            <header class="top-header">
+                <div class="brand">방구석 평론가</div>
+                <div class="header-right">
+                    <form action="/search" method="get" class="header-search active">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" name="q" value="{{ query }}" placeholder="영화를 검색하세요...">
+                    </form>
+                    <div class="nickname">{{ nickname }}</div>
                 </div>
-            {% endfor %}
-        </div>
+            </header>
 
-        <a href="/movie-search" class="back-link">다시 검색</a>
+            <main class="page-content">
+                <div class="result-count">검색 결과: <strong>{{ result_count }}개의 영화</strong></div>
+
+                {% if results|length == 0 %}
+                <section class="empty-result-box">
+                    <div class="empty-icon">⊖</div>
+                    <h2>검색 결과가 없습니다</h2>
+                    <p>다른 키워드로 다시 검색해 보세요</p>
+                    <a href="/main" class="btn btn-secondary small-center">다시 검색하기</a>
+                </section>
+                {% else %}
+                <div class="movie-grid six">
+                    {% for movie in results %}
+                    <a href="/movie/{{ movie.id }}" class="movie-card simple result-card">
+                        <div class="poster-box">
+                            {% if movie.poster_path %}
+                            <img src="{{ image_base_url }}{{ movie.poster_path }}" alt="포스터">
+                            {% else %}
+                            <span>포스터</span>
+                            {% endif %}
+                        </div>
+                        <div class="movie-card-body">
+                            <div class="movie-card-title">{{ movie.title }}</div>
+                            <div class="movie-card-meta">{{ movie.release_date[:4] if movie.release_date else '개봉일 미정' }}</div>
+                            <div class="freshness-badge">TMDB {{ movie.vote_average }}</div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </main>
+        </div>
     </div>
 </body>
 </html>

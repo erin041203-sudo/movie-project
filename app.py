@@ -1,3 +1,4 @@
+'''
 from flask import Flask, render_template, request
 import requests
 
@@ -48,4 +49,4 @@ def movie_detail(movie_id):
     return render_template('movie_detail.html', movie=movie, image_base_url=IMAGE_BASE_URL)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True) '''

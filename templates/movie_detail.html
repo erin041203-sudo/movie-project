@@ -6,23 +6,136 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>{{ movie.title }}</h1>
+    <div class="window-frame">
+        <div class="window-bar"></div>
 
-        <div class="detail-card">
-            {% if movie.poster_path %}
-                <img src="{{ image_base_url }}{{ movie.poster_path }}" alt="포스터">
-            {% endif %}
+        <div class="app-shell">
+            <header class="top-header">
+                <div class="brand">방구석 평론가</div>
+                <div class="header-right">
+                    <form action="/search" method="get" class="header-search">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" name="q" placeholder="영화를 검색하세요...">
+                    </form>
+                    <div class="nickname">{{ nickname }}</div>
+                </div>
+            </header>
 
-            <div class="movie-info">
-                <p>원제: {{ movie.original_title }}</p>
-                <p>개봉일: {{ movie.release_date }}</p>
-                <p>평점: {{ movie.vote_average }}</p>
-                <p>줄거리: {{ movie.overview }}</p>
-            </div>
+            <main class="page-content detail-page">
+                <a href="/main" class="back-link">← 돌아가기</a>
+
+                <section class="detail-top">
+                    <div class="detail-poster">
+                        {% if movie.poster_path %}
+                        <img src="{{ image_base_url }}{{ movie.poster_path }}" alt="포스터">
+                        {% else %}
+                        <div class="poster-box large"><span>포스터</span></div>
+                        {% endif %}
+                    </div>
+
+                    <div class="detail-main-info">
+                        <h1>{{ movie.title }}</h1>
+
+                        <div class="genre-tags">
+                            {% for genre in movie.genres %}
+                            <span class="tag">{{ genre.name }}</span>
+                            {% endfor %}
+                        </div>
+
+                        <div class="movie-meta-line">
+                            <span>📅 {{ movie.release_date }}</span>
+                            <span>TMDB {{ movie.vote_average }}</span>
+                        </div>
+
+                        <div class="favorite-link">♡ 즐겨찾기에 추가</div>
+
+                        <div class="summary-box">
+                            <h3>줄거리</h3>
+                            <p>{{ movie.overview }}</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="review-write-section">
+                    <h2>리뷰 작성</h2>
+                    <div class="section-divider"></div>
+                    <textarea placeholder="리뷰를 작성해주세요... (최소 10자)"></textarea>
+                    <div class="write-btn-row">
+                        <a href="/movie/{{ movie.id }}?analysis=loading" class="btn btn-primary">리뷰 등록</a>
+                    </div>
+                </section>
+
+                {% if analysis_mode == "loading" %}
+                <section class="analysis-grid">
+                    <div class="analysis-card loading-card">
+                        <div class="loading-label">분석 중...</div>
+                        <div class="spinner"></div>
+                        <p>리뷰를 분석하고 있습니다.<br>잠시 후 결과가 자동으로 표시됩니다.</p>
+                        <a href="/movie/{{ movie.id }}?analysis=result" class="hidden-jump">결과 보기</a>
+                    </div>
+
+                    <div class="analysis-card">
+                        <h3>종합 요약</h3>
+                        <div class="dashed-box">분석이 완료되면 표시됩니다</div>
+                    </div>
+                </section>
+                {% else %}
+                <section class="analysis-grid">
+                    <div class="analysis-card">
+                        <h3>분석 결과</h3>
+                        <div class="analysis-result-box">
+                            <div class="radar-placeholder">
+                                <div class="radar-shape"></div>
+                                <div class="radar-label top">스토리</div>
+                                <div class="radar-label right-top">연기</div>
+                                <div class="radar-label right-bottom">연출</div>
+                                <div class="radar-label left-bottom">음악</div>
+                                <div class="radar-label left-top">몰입도</div>
+                            </div>
+                            <div class="score-box">
+                                <div class="score-big">4.4</div>
+                                <div class="score-text">평균점수</div>
+                                <div class="fresh-big">95%</div>
+                                <div class="score-text">신선도 지수</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analysis-card">
+                        <h3>종합 요약</h3>
+                        <div class="analysis-summary-text">
+                            이 영화는 <strong>연기</strong> 부문에서 [황정민, 열연, 몰입감]이라는 평이 많았고,
+                            <strong>스토리</strong> 부문에서 [긴장감, 실화, 역사]에 대한 언급이 많았으며,
+                            <strong>연출</strong> 부문에서 [속도감, 묘사]에 관한 평가가 두드러졌습니다.
+                        </div>
+                    </div>
+                </section>
+                {% endif %}
+
+                <section class="user-review-section">
+                    <h2>사용자 리뷰</h2>
+
+                    {% for review in other_reviews %}
+                    <div class="review-card">
+                        <div class="review-left">
+                            <div class="avatar">{{ review.initial }}</div>
+                        </div>
+
+                        <div class="review-center">
+                            <div class="review-name">{{ review.name }}</div>
+                            <div class="review-content">{{ review.content }}</div>
+                            <div class="review-date">{{ review.date }}</div>
+                        </div>
+
+                        <div class="review-right">
+                            <div class="review-rating">★ {{ review.rating }}</div>
+                            <button class="helpful-btn">👍 도움돼요 {{ review.helpful }}</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </section>
+            </main>
         </div>
-
-        <a href="/movie-search" class="back-link">검색으로 돌아가기</a>
     </div>
 </body>
 </html>
