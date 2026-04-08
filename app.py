@@ -468,5 +468,25 @@ def dictionary_admin_action():
 
     return redirect(url_for("dictionary_admin"))
 
+def reset_dictionary_demo_data():
+    global open_dictionary_words, open_dictionary_requests
+
+    open_dictionary_words = [
+        {"id": 1, "word": "레전드", "category": "스토리", "sentiment": "긍정", "count": 2341},
+        {"id": 2, "word": "몰입감", "category": "몰입도", "sentiment": "긍정", "count": 1892},
+        {"id": 3, "word": "노잼", "category": "스토리", "sentiment": "부정", "count": 1204},
+        {"id": 4, "word": "소름", "category": "연기", "sentiment": "긍정", "count": 987},
+        {"id": 5, "word": "지루", "category": "몰입도", "sentiment": "부정", "count": 843},
+        {"id": 6, "word": "띵작", "category": "스토리", "sentiment": "긍정", "count": 721}
+    ]
+
+    open_dictionary_requests = [
+        {"id": 1, "word": "밤티", "category": "연출", "sentiment": "부정", "count": 3},
+        {"id": 2, "word": "갓벽", "category": "연기", "sentiment": "긍정", "count": 7},
+        {"id": 3, "word": "띵작", "category": "스토리", "sentiment": "긍정", "count": 12}
+    ]
+
+reset_dictionary_demo_data()
+
 if __name__ == "__main__":
     app.run(debug=True)
