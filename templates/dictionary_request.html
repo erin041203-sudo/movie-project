@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>단어 등록 신청</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="window-frame">
+        <div class="window-bar"></div>
+
+        <div class="app-shell">
+            <header class="top-header">
+                <div class="brand">방구석 평론가</div>
+                <div class="header-right">
+                    <div class="nickname">{{ nickname }}</div>
+                </div>
+            </header>
+
+            <main class="page-content">
+                <a href="/dictionary" class="back-link">← 돌아가기</a>
+
+                <section class="dictionary-request-page">
+                    <h1>단어 등록 신청</h1>
+
+                    <div class="dictionary-request-card">
+                        <form action="/dictionary/request" method="post" class="dictionary-request-form">
+                            <label>신청할 단어 *</label>
+                            <input type="text" name="word" placeholder="단어를 입력하세요" required>
+
+                            <label>항목 분류 *</label>
+                            <select name="category" required>
+                                {% for category in categories %}
+                                <option value="{{ category }}">{{ category }}</option>
+                                {% endfor %}
+                            </select>
+
+                            <label>감성 극성 *</label>
+                            <div class="dictionary-radio-row">
+                                <label class="dictionary-radio-label">
+                                    <input type="radio" name="sentiment" value="긍정" checked>
+                                    긍정
+                                </label>
+                                <label class="dictionary-radio-label">
+                                    <input type="radio" name="sentiment" value="부정">
+                                    부정
+                                </label>
+                            </div>
+
+                            <div class="dictionary-info-box">
+                                신청한 단어는 관리자 검토 후 사전에 반영됩니다.
+                            </div>
+
+                            <div class="dictionary-request-actions">
+                                <button type="submit" class="btn btn-primary">신청하기</button>
+                                <a href="/dictionary" class="btn btn-secondary">취소</a>
+                            </div>
+                        </form>
+                    </div>
+
+                    {% if submitted %}
+                    <div class="dictionary-submit-result">
+                        신청이 완료되었습니다.
+                    </div>
+                    {% endif %}
+                </section>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

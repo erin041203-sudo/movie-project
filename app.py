@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for
+from collections import Counter
 import requests
 
 app = Flask(__name__)
@@ -25,6 +26,75 @@ reviews = [
         "movie_title": "파묘",
         "content": "한국적인 공포와 미스터리가 잘 결합된 작품입니다. 최민식 배우의 존재감이 강렬했습니다.",
         "date": "2024-01-05"
+    }
+]
+
+open_dictionary_words = [
+    {
+        "id": 1,
+        "word": "레전드",
+        "category": "스토리",
+        "sentiment": "긍정",
+        "count": 2341
+    },
+    {
+        "id": 2,
+        "word": "몰입감",
+        "category": "몰입도",
+        "sentiment": "긍정",
+        "count": 1892
+    },
+    {
+        "id": 3,
+        "word": "노잼",
+        "category": "스토리",
+        "sentiment": "부정",
+        "count": 1204
+    },
+    {
+        "id": 4,
+        "word": "소름",
+        "category": "연기",
+        "sentiment": "긍정",
+        "count": 987
+    },
+    {
+        "id": 5,
+        "word": "지루",
+        "category": "몰입도",
+        "sentiment": "부정",
+        "count": 843
+    },
+    {
+        "id": 6,
+        "word": "띵작",
+        "category": "스토리",
+        "sentiment": "긍정",
+        "count": 721
+    }
+]
+
+open_dictionary_requests = [
+    {
+        "id": 1,
+        "word": "밤티",
+        "category": "연출",
+        "sentiment": "부정",
+        "count": 3
+    },
+    {
+        "id": 2,
+        "word": "갓벽",
+        "category": "연기",
+        "sentiment": "긍정",
+        "count": 7
+    },
+    {
+        "id": 3,
+        "word": "띵작",
+        "category": "스토리",
+        "sentiment": "긍정",
+        "count": 12
     }
 ]
 
@@ -96,6 +166,50 @@ dummy_other_reviews = [
         "helpful": 4
     }
 ]
+
+def get_category_list():
+    return ["전체", "스토리", "연출", "연기", "몰입도", "음악"]
+
+def get_badge_class_for_category(category):
+    if category == "스토리":
+        return "story"
+    if category == "연출":
+        return "directing"
+    if category == "연기":
+        return "acting"
+    if category == "몰입도":
+        return "immersion"
+    if category == "음악":
+        return "music"
+    return "default"
+
+def get_badge_class_for_sentiment(sentiment):
+    if sentiment == "긍정":
+        return "positive"
+    return "negative"
+
+def enrich_dictionary_items(items):
+    enriched = []
+    for item in items:
+        new_item = item.copy()
+        new_item["category_class"] = get_badge_class_for_category(item["category"])
+        new_item["sentiment_class"] = get_badge_class_for_sentiment(item["sentiment"])
+        enriched.append(new_item)
+    return enriched
+
+def get_next_dictionary_request_id():
+    if not open_dictionary_requests:
+        return 1
+    return max(item["id"] for item in open_dictionary_requests) + 1
+
+def get_next_dictionary_word_id():
+    if not open_dictionary_words:
+        return 1
+    return max(item["id"] for item in open_dictionary_words) + 1
+
+def get_recent_registered_words(limit=4):
+    sorted_words = sorted(open_dictionary_words, key=lambda x: x["id"], reverse=True)
+    return enrich_dictionary_items(sorted_words[:limit])
 
 def get_movie_detail_data(movie_id):
     url = f"{BASE_URL}/movie/{movie_id}"
@@ -231,6 +345,128 @@ def my_reviews():
 @app.route("/movie-search")
 def movie_search():
     return redirect(url_for("main"))
+
+@app.route("/dictionary")
+def dictionary():
+    keyword = request.args.get("q", "").strip()
+    selected_category = request.args.get("category", "전체")
+
+    filtered_words = open_dictionary_words[:]
+
+    if selected_category != "전체":
+        filtered_words = [item for item in filtered_words if item["category"] == selected_category]
+
+    if keyword:
+        filtered_words = [item for item in filtered_words if keyword.lower() in item["word"].lower()]
+
+    filtered_words = sorted(filtered_words, key=lambda x: x["count"], reverse=True)
+
+    enriched_words = enrich_dictionary_items(filtered_words)
+
+    for index, item in enumerate(enriched_words, start=1):
+        item["rank"] = index
+
+    return render_template(
+        "dictionary.html",
+        nickname="남채은 님",
+        dictionary_words=enriched_words,
+        categories=get_category_list(),
+        selected_category=selected_category,
+        keyword=keyword
+    )
+
+@app.route("/dictionary/request", methods=["GET", "POST"])
+def dictionary_request():
+    if request.method == "POST":
+        word = request.form.get("word", "").strip()
+        category = request.form.get("category", "").strip()
+        sentiment = request.form.get("sentiment", "").strip()
+
+        if word and category and sentiment:
+            existing_request = None
+            for item in open_dictionary_requests:
+                if item["word"] == word and item["category"] == category and item["sentiment"] == sentiment:
+                    existing_request = item
+                    break
+
+            if existing_request:
+                existing_request["count"] += 1
+            else:
+                open_dictionary_requests.append(
+                    {
+                        "id": get_next_dictionary_request_id(),
+                        "word": word,
+                        "category": category,
+                        "sentiment": sentiment,
+                        "count": 1
+                    }
+                )
+
+        return redirect(url_for("dictionary_request", submitted="1"))
+
+    submitted = request.args.get("submitted", "")
+    return render_template(
+        "dictionary_request.html",
+        nickname="남채은 님",
+        submitted=submitted,
+        categories=["스토리", "연출", "연기", "몰입도", "음악"]
+    )
+
+@app.route("/admin/dictionary")
+def dictionary_admin():
+    pending_requests = enrich_dictionary_items(open_dictionary_requests)
+    recent_words = get_recent_registered_words()
+
+    return render_template(
+        "dictionary_admin.html",
+        pending_requests=pending_requests,
+        recent_words=recent_words,
+        pending_count=len(open_dictionary_requests)
+    )
+
+@app.route("/admin/dictionary/action", methods=["POST"])
+def dictionary_admin_action():
+    action = request.form.get("action", "").strip()
+    request_id = request.form.get("request_id", "").strip()
+
+    if not request_id:
+        return redirect(url_for("dictionary_admin"))
+
+    target_request = None
+    for item in open_dictionary_requests:
+        if str(item["id"]) == request_id:
+            target_request = item
+            break
+
+    if not target_request:
+        return redirect(url_for("dictionary_admin"))
+
+    if action == "approve":
+        existing_word = None
+        for item in open_dictionary_words:
+            if item["word"] == target_request["word"] and item["category"] == target_request["category"] and item["sentiment"] == target_request["sentiment"]:
+                existing_word = item
+                break
+
+        if existing_word:
+            existing_word["count"] += target_request["count"]
+        else:
+            open_dictionary_words.append(
+                {
+                    "id": get_next_dictionary_word_id(),
+                    "word": target_request["word"],
+                    "category": target_request["category"],
+                    "sentiment": target_request["sentiment"],
+                    "count": target_request["count"]
+                }
+            )
+
+        open_dictionary_requests.remove(target_request)
+
+    if action == "reject":
+        open_dictionary_requests.remove(target_request)
+
+    return redirect(url_for("dictionary_admin"))
 
 if __name__ == "__main__":
     app.run(debug=True)

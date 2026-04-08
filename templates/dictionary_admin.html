@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>오픈 사전 관리자</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="window-frame">
+        <div class="window-bar"></div>
+
+        <div class="app-shell">
+            <header class="top-header">
+                <div class="brand">방구석 평론가 - 관리자</div>
+                <div class="header-right">
+                    <div class="nickname">admin</div>
+                </div>
+            </header>
+
+            <main class="page-content">
+                <section class="dictionary-admin-page">
+                    <h1>사전 관리</h1>
+
+                    <div class="dictionary-admin-grid">
+                        <div class="dictionary-admin-panel">
+                            <div class="dictionary-admin-title-row">
+                                <h2>등록 신청 대기</h2>
+                                <span class="pending-count">{{ pending_count }}건</span>
+                            </div>
+
+                            <div class="dictionary-pending-list">
+                                {% for item in pending_requests %}
+                                <div class="dictionary-pending-card">
+                                    <div class="dictionary-pending-info">
+                                        <div class="dictionary-pending-word">{{ item.word }}</div>
+                                        <div class="dictionary-pending-meta">
+                                            {{ item.category }} · {{ item.sentiment }} · {{ item.count }}명 신청
+                                        </div>
+                                    </div>
+
+                                    <div class="dictionary-pending-actions">
+                                        <form action="/admin/dictionary/action" method="post">
+                                            <input type="hidden" name="request_id" value="{{ item.id }}">
+                                            <input type="hidden" name="action" value="approve">
+                                            <button type="submit" class="dictionary-admin-btn">승인</button>
+                                        </form>
+
+                                        <form action="/admin/dictionary/action" method="post">
+                                            <input type="hidden" name="request_id" value="{{ item.id }}">
+                                            <input type="hidden" name="action" value="reject">
+                                            <button type="submit" class="dictionary-admin-btn">거절</button>
+                                        </form>
+                                    </div>
+                                </div>
+                                {% endfor %}
+
+                                {% if pending_requests|length == 0 %}
+                                <div class="dictionary-admin-empty">
+                                    대기 중인 신청이 없습니다.
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="dictionary-admin-panel">
+                            <div class="dictionary-admin-title-row">
+                                <h2>최근 등록된 단어</h2>
+                            </div>
+
+                            <table class="dictionary-table compact">
+                                <thead>
+                                    <tr>
+                                        <th>단어</th>
+                                        <th>항목</th>
+                                        <th>극성</th>
+                                        <th>횟수</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in recent_words %}
+                                    <tr>
+                                        <td class="dictionary-word-cell">{{ item.word }}</td>
+                                        <td><span class="dict-badge category {{ item.category_class }}">{{ item.category }}</span></td>
+                                        <td><span class="dict-badge sentiment {{ item.sentiment_class }}">{{ item.sentiment }}</span></td>
+                                        <td>{{ item.count }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

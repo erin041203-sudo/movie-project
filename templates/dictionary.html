@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>오픈 사전</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="window-frame">
+        <div class="window-bar"></div>
+
+        <div class="app-shell">
+            <header class="top-header">
+                <div class="brand">방구석 평론가</div>
+                <div class="header-right">
+                    <form action="/search" method="get" class="header-search">
+                        <input type="text" name="q" placeholder="영화를 검색하세요...">
+                    </form>
+                    <div class="nickname">{{ nickname }}</div>
+                </div>
+            </header>
+
+            <main class="page-content">
+                <section class="dictionary-hero">
+                    <h1>오픈 사전</h1>
+                    <p>사용자들이 리뷰에서 자주 쓰는 단어를 함께 만들어가는 사전입니다</p>
+                </section>
+
+                <section class="dictionary-search-row">
+                    <form action="/dictionary" method="get" class="dictionary-search-form">
+                        <input type="text" name="q" value="{{ keyword }}" placeholder="단어 검색...">
+                        <input type="hidden" name="category" value="{{ selected_category }}">
+                    </form>
+                    <a href="/dictionary/request" class="dictionary-request-btn">+ 단어 등록 신청</a>
+                </section>
+
+                <section class="dictionary-filter-row">
+                    {% for category in categories %}
+                    <a href="/dictionary?category={{ category }}{% if keyword %}&q={{ keyword }}{% endif %}" class="dictionary-filter-chip {% if selected_category == category %}active{% endif %}">
+                        {{ category }}
+                    </a>
+                    {% endfor %}
+                </section>
+
+                <section class="dictionary-table-wrap">
+                    <table class="dictionary-table">
+                        <thead>
+                            <tr>
+                                <th>순위</th>
+                                <th>단어</th>
+                                <th>항목</th>
+                                <th>극성</th>
+                                <th>사용 횟수</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in dictionary_words %}
+                            <tr>
+                                <td>{{ item.rank }}</td>
+                                <td class="dictionary-word-cell">{{ item.word }}</td>
+                                <td><span class="dict-badge category {{ item.category_class }}">{{ item.category }}</span></td>
+                                <td><span class="dict-badge sentiment {{ item.sentiment_class }}">{{ item.sentiment }}</span></td>
+                                <td>{{ "{:,}".format(item.count) }}회</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    {% if dictionary_words|length == 0 %}
+                    <div class="dictionary-empty">
+                        검색 결과가 없습니다.
+                    </div>
+                    {% endif %}
+                </section>
+            </main>
+        </div>
+    </div>
+</body>
+</html>
