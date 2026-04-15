@@ -28,25 +28,6 @@
                             <label>신청할 단어 *</label>
                             <input type="text" name="word" placeholder="단어를 입력하세요" required>
 
-                            <label>항목 분류 *</label>
-                            <select name="category" required>
-                                {% for category in categories %}
-                                <option value="{{ category }}">{{ category }}</option>
-                                {% endfor %}
-                            </select>
-
-                            <label>감성 극성 *</label>
-                            <div class="dictionary-radio-row">
-                                <label class="dictionary-radio-label">
-                                    <input type="radio" name="sentiment" value="긍정" checked>
-                                    긍정
-                                </label>
-                                <label class="dictionary-radio-label">
-                                    <input type="radio" name="sentiment" value="부정">
-                                    부정
-                                </label>
-                            </div>
-
                             <div class="dictionary-info-box">
                                 신청한 단어는 관리자 검토 후 사전에 반영됩니다.
                             </div>

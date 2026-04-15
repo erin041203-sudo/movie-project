@@ -30,27 +30,35 @@
 
                             <div class="dictionary-pending-list">
                                 {% for item in pending_requests %}
-                                <div class="dictionary-pending-card">
+                                <div class="dictionary-pending-card vertical">
                                     <div class="dictionary-pending-info">
                                         <div class="dictionary-pending-word">{{ item.word }}</div>
                                         <div class="dictionary-pending-meta">
-                                            {{ item.category }} · {{ item.sentiment }} · {{ item.count }}명 신청
+                                            {{ item.count }}명 신청
                                         </div>
                                     </div>
 
-                                    <div class="dictionary-pending-actions">
-                                        <form action="/admin/dictionary/action" method="post">
-                                            <input type="hidden" name="request_id" value="{{ item.id }}">
-                                            <input type="hidden" name="action" value="approve">
-                                            <button type="submit" class="dictionary-admin-btn">승인</button>
-                                        </form>
+                                    <form action="/admin/dictionary/action" method="post" class="dictionary-admin-form">
+                                        <input type="hidden" name="request_id" value="{{ item.id }}">
 
-                                        <form action="/admin/dictionary/action" method="post">
-                                            <input type="hidden" name="request_id" value="{{ item.id }}">
-                                            <input type="hidden" name="action" value="reject">
-                                            <button type="submit" class="dictionary-admin-btn">거절</button>
-                                        </form>
-                                    </div>
+                                        <div class="dictionary-admin-select-row">
+                                            <select name="category" required>
+                                                {% for category in categories %}
+                                                <option value="{{ category }}">{{ category }}</option>
+                                                {% endfor %}
+                                            </select>
+
+                                            <select name="sentiment" required>
+                                                <option value="긍정">긍정</option>
+                                                <option value="부정">부정</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="dictionary-pending-actions">
+                                            <button type="submit" name="action" value="approve" class="dictionary-admin-btn">승인</button>
+                                            <button type="submit" name="action" value="reject" class="dictionary-admin-btn">거절</button>
+                                        </div>
+                                    </form>
                                 </div>
                                 {% endfor %}
 

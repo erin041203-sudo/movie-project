@@ -1472,3 +1472,29 @@ a {
         grid-template-columns: 1fr;
     }
 }
+
+.dictionary-pending-card.vertical {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.dictionary-admin-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dictionary-admin-select-row {
+    display: flex;
+    gap: 8px;
+}
+
+.dictionary-admin-select-row select {
+    flex: 1;
+    height: 42px;
+    border: 1px solid #cfd4dc;
+    border-radius: 8px;
+    padding: 0 12px;
+    font-size: 14px;
+    background: #fff;
+}

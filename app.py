@@ -78,22 +78,16 @@ open_dictionary_requests = [
     {
         "id": 1,
         "word": "밤티",
-        "category": "연출",
-        "sentiment": "부정",
         "count": 3
     },
     {
         "id": 2,
         "word": "갓벽",
-        "category": "연기",
-        "sentiment": "긍정",
         "count": 7
     },
     {
         "id": 3,
         "word": "띵작",
-        "category": "스토리",
-        "sentiment": "긍정",
         "count": 12
     }
 ]
@@ -379,13 +373,11 @@ def dictionary():
 def dictionary_request():
     if request.method == "POST":
         word = request.form.get("word", "").strip()
-        category = request.form.get("category", "").strip()
-        sentiment = request.form.get("sentiment", "").strip()
 
-        if word and category and sentiment:
+        if word:
             existing_request = None
             for item in open_dictionary_requests:
-                if item["word"] == word and item["category"] == category and item["sentiment"] == sentiment:
+                if item["word"] == word:
                     existing_request = item
                     break
 
@@ -396,8 +388,6 @@ def dictionary_request():
                     {
                         "id": get_next_dictionary_request_id(),
                         "word": word,
-                        "category": category,
-                        "sentiment": sentiment,
                         "count": 1
                     }
                 )
@@ -408,20 +398,19 @@ def dictionary_request():
     return render_template(
         "dictionary_request.html",
         nickname="남채은 님",
-        submitted=submitted,
-        categories=["스토리", "연출", "연기", "몰입도", "음악"]
+        submitted=submitted
     )
 
 @app.route("/admin/dictionary")
 def dictionary_admin():
-    pending_requests = enrich_dictionary_items(open_dictionary_requests)
     recent_words = get_recent_registered_words()
 
     return render_template(
         "dictionary_admin.html",
-        pending_requests=pending_requests,
+        pending_requests=open_dictionary_requests,
         recent_words=recent_words,
-        pending_count=len(open_dictionary_requests)
+        pending_count=len(open_dictionary_requests),
+        categories=["스토리", "연출", "연기", "몰입도", "음악"]
     )
 
 @app.route("/admin/dictionary/action", methods=["POST"])
@@ -442,9 +431,15 @@ def dictionary_admin_action():
         return redirect(url_for("dictionary_admin"))
 
     if action == "approve":
+        category = request.form.get("category", "").strip()
+        sentiment = request.form.get("sentiment", "").strip()
+
+        if not category or not sentiment:
+            return redirect(url_for("dictionary_admin"))
+
         existing_word = None
         for item in open_dictionary_words:
-            if item["word"] == target_request["word"] and item["category"] == target_request["category"] and item["sentiment"] == target_request["sentiment"]:
+            if item["word"] == target_request["word"] and item["category"] == category and item["sentiment"] == sentiment:
                 existing_word = item
                 break
 
@@ -455,38 +450,18 @@ def dictionary_admin_action():
                 {
                     "id": get_next_dictionary_word_id(),
                     "word": target_request["word"],
-                    "category": target_request["category"],
-                    "sentiment": target_request["sentiment"],
+                    "category": category,
+                    "sentiment": sentiment,
                     "count": target_request["count"]
                 }
             )
 
         open_dictionary_requests.remove(target_request)
 
-    if action == "reject":
+    elif action == "reject":
         open_dictionary_requests.remove(target_request)
 
     return redirect(url_for("dictionary_admin"))
-
-def reset_dictionary_demo_data():
-    global open_dictionary_words, open_dictionary_requests
-
-    open_dictionary_words = [
-        {"id": 1, "word": "레전드", "category": "스토리", "sentiment": "긍정", "count": 2341},
-        {"id": 2, "word": "몰입감", "category": "몰입도", "sentiment": "긍정", "count": 1892},
-        {"id": 3, "word": "노잼", "category": "스토리", "sentiment": "부정", "count": 1204},
-        {"id": 4, "word": "소름", "category": "연기", "sentiment": "긍정", "count": 987},
-        {"id": 5, "word": "지루", "category": "몰입도", "sentiment": "부정", "count": 843},
-        {"id": 6, "word": "띵작", "category": "스토리", "sentiment": "긍정", "count": 721}
-    ]
-
-    open_dictionary_requests = [
-        {"id": 1, "word": "밤티", "category": "연출", "sentiment": "부정", "count": 3},
-        {"id": 2, "word": "갓벽", "category": "연기", "sentiment": "긍정", "count": 7},
-        {"id": 3, "word": "띵작", "category": "스토리", "sentiment": "긍정", "count": 12}
-    ]
-
-reset_dictionary_demo_data()
 
 if __name__ == "__main__":
     app.run(debug=True)
