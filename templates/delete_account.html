@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>회원 탈퇴</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="window-frame">
+        <div class="window-bar"></div>
+
+        <div class="auth-page">
+            <div class="register-card">
+                <h1 class="register-title">회원 탈퇴</h1>
+
+                <div class="delete-warning">
+                    탈퇴하면 아래 정보가 삭제됩니다.<br>
+                    정말 탈퇴하시겠습니까?
+                </div>
+
+                <div class="delete-summary">
+                    <div class="delete-summary-row">
+                        <span>작성한 리뷰</span>
+                        <strong>{{ review_count }}개</strong>
+                    </div>
+                    <div class="delete-summary-row">
+                        <span>즐겨찾기 영화</span>
+                        <strong>{{ favorite_count }}개</strong>
+                    </div>
+                </div>
+
+                <form method="post" action="/delete-account">
+                    <div class="auth-actions">
+                        <button type="submit" class="btn btn-danger">탈퇴하기</button>
+                        <a href="/main" class="btn btn-secondary">취소</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -17,8 +17,18 @@
                         <span class="search-icon">🔍</span>
                         <input type="text" name="q" placeholder="영화를 검색하세요...">
                     </form>
-                    <div class="nickname">{{ nickname }}</div>
-                </div>
+                    <div class="user-menu">
+                        <button type="button" class="user-menu-button" onclick="toggleUserMenu()">
+                            {{ nickname }} ▾
+                        </button>
+                        <div id="userMenuDropdown" class="user-menu-dropdown">
+                            {% if is_admin %}
+                            <a href="/admin/dictionary">관리자 화면</a>
+                            {% endif %}
+                            <a href="/logout">로그아웃</a>
+                            <a href="/delete-account" class="danger">회원 탈퇴</a>
+                        </div>
+                    </div>
             </header>
 
             <main class="page-content">
@@ -80,5 +90,20 @@
             </main>
         </div>
     </div>
+<script>
+function toggleUserMenu() {
+    const menu = document.getElementById("userMenuDropdown");
+    menu.classList.toggle("show");
+}
+
+document.addEventListener("click", function (event) {
+    const userMenu = document.querySelector(".user-menu");
+    const dropdown = document.getElementById("userMenuDropdown");
+
+    if (userMenu && dropdown && !userMenu.contains(event.target)) {
+        dropdown.classList.remove("show");
+    }
+});
+</script>
 </body>
 </html>

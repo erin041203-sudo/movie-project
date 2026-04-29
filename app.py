@@ -1,170 +1,200 @@
-from flask import Flask, render_template, request, redirect, url_for
-from collections import Counter
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import requests
+import sqlite3
+import os
+import random
+import bcrypt
 
 app = Flask(__name__)
+app.secret_key = "movie-review-secret"
 
-API_KEY = "bf8d8752e8552276db00970a4f4f2f74"
+API_KEY = os.getenv("bf8d8752e8552276db00970a4f4f2f74", "bf8d8752e8552276db00970a4f4f2f74")
 BASE_URL = "https://api.themoviedb.org/3"
 IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"
+DB_NAME = "reviews.db"
+ADMIN_USER_IDS = ["chaeeuno4"]
 
-reviews = [
-    {
-        "id": 1,
-        "movie_title": "서울의 봄",
-        "content": "황정민 배우의 연기가 정말 압도적이었습니다. 실화라는 걸 알면서도 손에 땀을 쥐고 봤어요.",
-        "date": "2024-01-15"
-    },
-    {
-        "id": 2,
-        "movie_title": "기생충",
-        "content": "봉준호 감독의 연출이 정말 탁월합니다. 계단 하나하나에 상징이 담겨 있어 볼수록 새로운 영화입니다.",
-        "date": "2024-01-10"
-    },
-    {
-        "id": 3,
-        "movie_title": "파묘",
-        "content": "한국적인 공포와 미스터리가 잘 결합된 작품입니다. 최민식 배우의 존재감이 강렬했습니다.",
-        "date": "2024-01-05"
-    }
-]
+def is_admin_account(user_id):
+    return user_id in ADMIN_USER_IDS
 
-open_dictionary_words = [
-    {
-        "id": 1,
-        "word": "레전드",
-        "category": "스토리",
-        "sentiment": "긍정",
-        "count": 2341
-    },
-    {
-        "id": 2,
-        "word": "몰입감",
-        "category": "몰입도",
-        "sentiment": "긍정",
-        "count": 1892
-    },
-    {
-        "id": 3,
-        "word": "노잼",
-        "category": "스토리",
-        "sentiment": "부정",
-        "count": 1204
-    },
-    {
-        "id": 4,
-        "word": "소름",
-        "category": "연기",
-        "sentiment": "긍정",
-        "count": 987
-    },
-    {
-        "id": 5,
-        "word": "지루",
-        "category": "몰입도",
-        "sentiment": "부정",
-        "count": 843
-    },
-    {
-        "id": 6,
-        "word": "띵작",
-        "category": "스토리",
-        "sentiment": "긍정",
-        "count": 721
-    }
-]
+def get_db():
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-open_dictionary_requests = [
-    {
-        "id": 1,
-        "word": "밤티",
-        "count": 3
-    },
-    {
-        "id": 2,
-        "word": "갓벽",
-        "count": 7
-    },
-    {
-        "id": 3,
-        "word": "띵작",
-        "count": 12
-    }
-]
+def init_db():
+    conn = get_db()
+    cur = conn.cursor()
 
-dummy_popular_movies = [
-    {"id": 447365, "title": "범죄도시4", "freshness": "92%", "genre": "액션 / 범죄", "poster_path": None},
-    {"id": 99999, "title": "파묘", "freshness": "87%", "genre": "공포 / 미스터리", "poster_path": None},
-    {"id": 12345, "title": "서울의 봄", "freshness": "95%", "genre": "드라마 / 역사", "poster_path": None},
-    {"id": 1022789, "title": "인사이드 아웃2", "freshness": "88%", "genre": "애니메이션", "poster_path": None},
-    {"id": 762509, "title": "듄: 파트2", "freshness": "82%", "genre": "SF / 어드벤처", "poster_path": None}
-]
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            nickname TEXT NOT NULL,
+            is_admin INTEGER DEFAULT 0
+        )
+    """)
 
-dummy_favorites = [
-    {"id": 1165067, "title": "올드보이", "freshness": "90%", "genre": "스릴러", "poster_path": None},
-    {"id": 496243, "title": "기생충", "freshness": "97%", "genre": "드라마", "poster_path": None},
-    {"id": 786892, "title": "부산행", "freshness": "93%", "genre": "액션", "poster_path": None},
-    {"id": 99998, "title": "곡성", "freshness": "85%", "genre": "미스터리", "poster_path": None}
-]
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            movie_id INTEGER NOT NULL,
+            movie_title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
-dummy_my_reviews = [
-    {
-        "id": 1,
-        "movie_id": 12345,
-        "title": "서울의 봄",
-        "content": "황정민 배우의 연기가 정말 압도적이었습니다. 실화라는 걸 알면서도 손에 땀을 쥐고 봤어요.",
-        "date": "2024-01-15",
-        "editing": False
-    },
-    {
-        "id": 2,
-        "movie_id": 496243,
-        "title": "기생충",
-        "content": "봉준호 감독의 연출이 정말 탁월합니다. 계단 하나하나에 상징이 담겨 있어서 볼수록 새로운 영화예요.",
-        "date": "2024-01-10",
-        "editing": False
-    },
-    {
-        "id": 3,
-        "movie_id": 99999,
-        "title": "파묘",
-        "content": "한국적인 공포와 미스터리가 잘 결합된 작품입니다. 최민식 배우의 존재감이 압도적이었어요.",
-        "date": "2024-01-05",
-        "editing": False
-    }
-]
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            movie_id INTEGER NOT NULL,
+            movie_title TEXT NOT NULL,
+            poster_path TEXT,
+            freshness TEXT DEFAULT '90%',
+            UNIQUE(user_id, movie_id)
+        )
+    """)
 
-dummy_other_reviews = [
-    {
-        "name": "남채은",
-        "initial": "남",
-        "rating": "5.0",
-        "date": "2024-01-15",
-        "content": "황정민 배우의 연기가 정말 압도적이었습니다. 실화라는 걸 알면서도 손에 땀을 쥐고 봤어요. 역대 최고의 한국 영화 중 하나라고 생각합니다.",
-        "helpful": 12
-    },
-    {
-        "name": "익명1",
-        "initial": "1",
-        "rating": "4.5",
-        "date": "2024-01-10",
-        "content": "역사를 잘 모르는 상태에서 봤는데도 너무 몰입했어요. 전개 속도가 빠르고 결말이 묵직하게 남습니다.",
-        "helpful": 7
-    },
-    {
-        "name": "익명2",
-        "initial": "2",
-        "rating": "4.0",
-        "date": "2024-01-08",
-        "content": "후반부로 갈수록 점점 더 긴장감이 올라가는 연출이 훌륭했습니다. 다만 역사를 미리 알고 가면 더 몰입할 수 있을 것 같아요.",
-        "helpful": 4
-    }
-]
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS dictionary_words (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            word TEXT NOT NULL,
+            category TEXT NOT NULL,
+            sentiment TEXT NOT NULL,
+            count INTEGER DEFAULT 1
+        )
+    """)
 
-def get_category_list():
-    return ["전체", "스토리", "연출", "연기", "몰입도", "음악"]
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS dictionary_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            word TEXT UNIQUE NOT NULL,
+            count INTEGER DEFAULT 1
+        )
+    """)
 
-def get_badge_class_for_category(category):
+    cur.execute("SELECT id FROM users WHERE user_id = ?", ("admin",))
+    if cur.fetchone() is None:
+        cur.execute(
+            "INSERT INTO users (user_id, password, nickname, is_admin) VALUES (?, ?, ?, ?)",
+            ("admin", "admin1234", "관리자", 1)
+        )
+
+    cur.execute("SELECT COUNT(*) AS cnt FROM dictionary_words")
+    if cur.fetchone()["cnt"] == 0:
+        words = [
+            ("레전드", "스토리", "긍정", 2341),
+            ("몰입감", "몰입도", "긍정", 1892),
+            ("노잼", "스토리", "부정", 1204),
+            ("소름", "연기", "긍정", 987),
+            ("지루", "몰입도", "부정", 843),
+            ("띵작", "스토리", "긍정", 721)
+        ]
+        cur.executemany(
+            "INSERT INTO dictionary_words (word, category, sentiment, count) VALUES (?, ?, ?, ?)",
+            words
+        )
+
+    cur.execute("SELECT COUNT(*) AS cnt FROM dictionary_requests")
+    if cur.fetchone()["cnt"] == 0:
+        requests_data = [
+            ("밤티", 3),
+            ("갓벽", 7),
+            ("띵작", 12)
+        ]
+        cur.executemany(
+            "INSERT INTO dictionary_requests (word, count) VALUES (?, ?)",
+            requests_data
+        )
+
+    conn.commit()
+    conn.close()
+
+def login_required():
+    return "user_id" in session
+
+def get_current_user():
+    if "user_id" not in session:
+        return None
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+    conn.close()
+    return user
+
+def get_nickname():
+    user = get_current_user()
+    if user:
+        return user["nickname"] + " 님"
+    return "게스트 님"
+
+def make_random_nickname():
+    adjectives = ["영화보는", "조용한", "날카로운", "감성적인", "집중하는", "솔직한", "방구석"]
+    nouns = ["평론가", "관객", "리뷰어", "시네필", "감상러", "영화팬"]
+    number = random.randint(100, 999)
+    return f"{random.choice(adjectives)}{random.choice(nouns)}{number}"
+
+def is_valid_user_id(user_id):
+    if len(user_id) < 4 or len(user_id) > 20:
+        return False
+    return user_id.isalnum()
+
+def tmdb_get(path, params=None):
+    if params is None:
+        params = {}
+    params["api_key"] = API_KEY
+    try:
+        response = requests.get(BASE_URL + path, params=params, timeout=5)
+        if response.status_code == 200:
+            return response.json()
+    except:
+        return None
+    return None
+
+def get_popular_movies():
+    data = tmdb_get("/movie/popular", {"language": "ko-KR", "page": 1})
+    if data:
+        movies = []
+        for item in data.get("results", [])[:5]:
+            movies.append({
+                "id": item.get("id"),
+                "title": item.get("title"),
+                "freshness": str(int(item.get("vote_average", 0) * 10)) + "%",
+                "genre": "인기 영화",
+                "poster_path": item.get("poster_path")
+            })
+        return movies
+
+    return [
+        {"id": 447365, "title": "범죄도시4", "freshness": "92%", "genre": "액션 / 범죄", "poster_path": None},
+        {"id": 99999, "title": "파묘", "freshness": "87%", "genre": "공포 / 미스터리", "poster_path": None},
+        {"id": 12345, "title": "서울의 봄", "freshness": "95%", "genre": "드라마 / 역사", "poster_path": None},
+        {"id": 1022789, "title": "인사이드 아웃2", "freshness": "88%", "genre": "애니메이션", "poster_path": None},
+        {"id": 762509, "title": "듄: 파트2", "freshness": "82%", "genre": "SF / 어드벤처", "poster_path": None}
+    ]
+
+def get_favorite_movies(user_id):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT movie_id AS id, movie_title AS title, poster_path, freshness FROM favorites WHERE user_id = ? ORDER BY id DESC",
+        (user_id,)
+    ).fetchall()
+    conn.close()
+
+    if rows:
+        return [dict(row) for row in rows]
+
+    return [
+        {"id": 1165067, "title": "올드보이", "freshness": "90%", "poster_path": None},
+        {"id": 496243, "title": "기생충", "freshness": "97%", "poster_path": None},
+        {"id": 786892, "title": "부산행", "freshness": "93%", "poster_path": None},
+        {"id": 99998, "title": "곡성", "freshness": "85%", "poster_path": None}
+    ]
+
+def get_category_class(category):
     if category == "스토리":
         return "story"
     if category == "연출":
@@ -177,105 +207,231 @@ def get_badge_class_for_category(category):
         return "music"
     return "default"
 
-def get_badge_class_for_sentiment(sentiment):
+def get_sentiment_class(sentiment):
     if sentiment == "긍정":
         return "positive"
     return "negative"
 
-def enrich_dictionary_items(items):
-    enriched = []
-    for item in items:
-        new_item = item.copy()
-        new_item["category_class"] = get_badge_class_for_category(item["category"])
-        new_item["sentiment_class"] = get_badge_class_for_sentiment(item["sentiment"])
-        enriched.append(new_item)
-    return enriched
-
-def get_next_dictionary_request_id():
-    if not open_dictionary_requests:
-        return 1
-    return max(item["id"] for item in open_dictionary_requests) + 1
-
-def get_next_dictionary_word_id():
-    if not open_dictionary_words:
-        return 1
-    return max(item["id"] for item in open_dictionary_words) + 1
-
-def get_recent_registered_words(limit=4):
-    sorted_words = sorted(open_dictionary_words, key=lambda x: x["id"], reverse=True)
-    return enrich_dictionary_items(sorted_words[:limit])
-
-def get_movie_detail_data(movie_id):
-    url = f"{BASE_URL}/movie/{movie_id}"
-    params = {
-        "api_key": API_KEY,
-        "language": "ko-KR"
-    }
-    try:
-        response = requests.get(url, params=params, timeout=5)
-        if response.status_code == 200:
-            return response.json()
-    except:
-        pass
-    return None
-
-def search_movies_data(keyword):
-    url = f"{BASE_URL}/search/movie"
-    params = {
-        "api_key": API_KEY,
-        "query": keyword,
-        "language": "ko-KR"
-    }
-    try:
-        response = requests.get(url, params=params, timeout=5)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("results", [])
-    except:
-        pass
-    return []
+def enrich_dictionary_items(rows):
+    items = []
+    for row in rows:
+        item = dict(row)
+        item["category_class"] = get_category_class(item["category"])
+        item["sentiment_class"] = get_sentiment_class(item["sentiment"])
+        items.append(item)
+    return items
 
 @app.route("/")
-def home():
+def root():
     return redirect(url_for("login"))
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    message = request.args.get("message", "")
+    error = ""
+
     if request.method == "POST":
-        return redirect(url_for("main"))
-    return render_template("login.html")
+        user_id = request.form.get("user_id", "").strip()
+        password = request.form.get("password", "").strip()
+
+        conn = get_db()
+        user_by_id = conn.execute(
+            "SELECT * FROM users WHERE user_id = ?",
+            (user_id,)
+        ).fetchone()
+
+        if not user_by_id:
+            conn.close()
+            return render_template(
+                "login.html",
+                error="가입되지 않은 아이디입니다. 회원가입을 진행해주세요.",
+                message=message
+            )
+
+        user = user_by_id
+        conn.close()
+
+        stored_pw = user["password"]
+
+        if isinstance(stored_pw, str):
+            stored_pw = stored_pw.encode("utf-8")
+
+        if bcrypt.checkpw(password.encode("utf-8"), stored_pw):
+            if is_admin_account(user["user_id"]) and user["is_admin"] != 1:
+                conn = get_db()
+                conn.execute(
+                    "UPDATE users SET is_admin = 1 WHERE id = ?",
+                    (user["id"],)
+                )
+                conn.commit()
+                conn.close()
+
+                user = get_current_user()
+
+            session["user_id"] = user["id"]
+            session["nickname"] = user["nickname"]
+            session["is_admin"] = user["is_admin"]
+            return redirect(url_for("main"))
+
+        return render_template(
+            "login.html",
+            error="비밀번호가 일치하지 않습니다.",
+            message=message
+        )
+
+    return render_template("login.html", message=message, error=error)
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
     error = ""
+    random_nickname = make_random_nickname()
+
     if request.method == "POST":
-        password = request.form.get("password", "")
-        password_confirm = request.form.get("password_confirm", "")
-        if password != password_confirm:
-            error = "비밀번호가 일치하지 않습니다"
+        user_id = request.form.get("user_id", "").strip()
+        password = request.form.get("password", "").strip()
+        password_confirm = request.form.get("password_confirm", "").strip()
+        nickname = request.form.get("nickname", "").strip()
+
+        if not user_id or not password or not password_confirm:
+            error = "필수 항목을 입력해주세요."
+        elif not is_valid_user_id(user_id):
+            error = "아이디는 4~20자의 영문/숫자만 사용할 수 있습니다."
+        elif len(password) < 8:
+            error = "비밀번호는 8자 이상이어야 합니다."
+        elif password != password_confirm:
+            error = "비밀번호가 일치하지 않습니다."
         else:
-            return redirect(url_for("login"))
-    return render_template("register.html", error=error)
+            if not nickname:
+                nickname = random_nickname
+
+            conn = get_db()
+            existing = conn.execute(
+                "SELECT * FROM users WHERE user_id = ?",
+                (user_id,)
+            ).fetchone()
+
+            if existing:
+                conn.close()
+                error = "이미 사용 중인 아이디입니다."
+            else:
+                hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+                is_admin = 1 if is_admin_account(user_id) else 0
+                
+                conn.execute(
+                    "INSERT INTO users (user_id, password, nickname, is_admin) VALUES (?, ?, ?, ?)",
+                    (user_id, hashed_pw, nickname, is_admin)
+                )
+                conn.commit()
+                conn.close()
+                return redirect(url_for("login", message="회원가입이 성공적으로 완료되었습니다. 로그인해주세요."))
+
+    return render_template(
+        "register.html",
+        error=error,
+        random_nickname=random_nickname
+    )
+
+@app.route("/check-user-id")
+def check_user_id():
+    user_id = request.args.get("user_id", "").strip()
+
+    if not is_valid_user_id(user_id):
+        return jsonify({"available": False, "message": "아이디 형식이 올바르지 않습니다."})
+
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT * FROM users WHERE user_id = ?",
+        (user_id,)
+    ).fetchone()
+    conn.close()
+
+    if existing:
+        return jsonify({"available": False, "message": "이미 사용 중인 아이디입니다."})
+
+    return jsonify({"available": True, "message": "사용 가능한 아이디입니다."})
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login", message="로그아웃되었습니다."))
+
+@app.route("/delete-account", methods=["GET", "POST"])
+@app.route("/delete-account", methods=["GET", "POST"])
+def delete_account():
+    if not login_required():
+        return redirect(url_for("login"))
+
+    user_id = session["user_id"]
+
+    conn = get_db()
+
+    review_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM reviews WHERE user_id = ?",
+        (user_id,)
+    ).fetchone()["count"]
+
+    favorite_count = conn.execute(
+        "SELECT COUNT(*) AS count FROM favorites WHERE user_id = ?",
+        (user_id,)
+    ).fetchone()["count"]
+
+    if request.method == "POST":
+        conn.execute("DELETE FROM reviews WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM favorites WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        conn.close()
+
+        session.clear()
+        return redirect(url_for("login", message="회원 탈퇴가 완료되었습니다."))
+
+    conn.close()
+
+    return render_template(
+        "delete_account.html",
+        nickname=get_nickname(),
+        review_count=review_count,
+        favorite_count=favorite_count
+    )
 
 @app.route("/main")
 def main():
+    if not login_required():
+        return redirect(url_for("login"))
+
+    popular_movies = get_popular_movies()
+    favorite_movies = get_favorite_movies(session["user_id"])
+
     return render_template(
         "index.html",
-        nickname="남채은 님",
-        popular_movies=dummy_popular_movies,
-        favorite_movies=dummy_favorites,
-        image_base_url=IMAGE_BASE_URL
+        nickname=get_nickname(),
+        popular_movies=popular_movies,
+        favorite_movies=favorite_movies,
+        image_base_url=IMAGE_BASE_URL,
+        is_admin=session.get("is_admin") == 1
     )
+
+@app.route("/movie-search")
+def movie_search():
+    return redirect(url_for("main"))
 
 @app.route("/search")
 def search():
+    if not login_required():
+        return redirect(url_for("login"))
+
     keyword = request.args.get("q", "").strip()
     results = []
+
     if keyword:
-        results = search_movies_data(keyword)
+        data = tmdb_get("/search/movie", {"query": keyword, "language": "ko-KR"})
+        if data:
+            results = data.get("results", [])
+
     return render_template(
         "search_result.html",
-        nickname="남채은 님",
+        nickname=get_nickname(),
         query=keyword,
         results=results,
         result_count=len(results),
@@ -284,42 +440,122 @@ def search():
 
 @app.route("/movie/<int:movie_id>")
 def movie_detail(movie_id):
-    movie = get_movie_detail_data(movie_id)
+    if not login_required():
+        return redirect(url_for("login"))
+
+    movie = tmdb_get(f"/movie/{movie_id}", {"language": "ko-KR"})
+
     if not movie:
-        title = "서울의 봄" if movie_id == 12345 else "파묘" if movie_id == 99999 else "영화 제목"
         movie = {
             "id": movie_id,
-            "title": title,
-            "release_date": "2023-11-22",
+            "title": "영화 제목",
+            "release_date": "2024-01-01",
             "vote_average": 7.9,
-            "overview": "1979년 12월 12일, 군사 반란을 막으려는 수도경비사령관과 이를 막으려는 보안사령관의 충돌로 시작된 9시간의 이야기...",
+            "overview": "영화 줄거리가 표시됩니다.",
             "poster_path": None,
-            "genres": [
-                {"name": "드라마"},
-                {"name": "역사"},
-                {"name": "스릴러"}
-            ]
+            "genres": [{"name": "드라마"}, {"name": "스릴러"}]
         }
-    analysis_mode = request.args.get("analysis", "result")
+
+    conn = get_db()
+    user_review = conn.execute(
+        "SELECT * FROM reviews WHERE user_id = ? AND movie_id = ? ORDER BY id DESC LIMIT 1",
+        (session["user_id"], movie_id)
+    ).fetchone()
+
+    other_reviews = conn.execute(
+        "SELECT r.*, u.nickname FROM reviews r JOIN users u ON r.user_id = u.id WHERE r.movie_id = ? ORDER BY r.id DESC",
+        (movie_id,)
+    ).fetchall()
+
+    favorite = conn.execute(
+        "SELECT * FROM favorites WHERE user_id = ? AND movie_id = ?",
+        (session["user_id"], movie_id)
+    ).fetchone()
+
+    conn.close()
+
     return render_template(
         "movie_detail.html",
-        nickname="남채은 님",
+        nickname=get_nickname(),
         movie=movie,
         image_base_url=IMAGE_BASE_URL,
-        analysis_mode=analysis_mode,
-        other_reviews=dummy_other_reviews
+        analysis_mode=request.args.get("analysis", "result"),
+        user_review=user_review,
+        other_reviews=other_reviews,
+        favorite=favorite
     )
+
+@app.route("/movie/<int:movie_id>/review", methods=["POST"])
+def submit_review(movie_id):
+    if not login_required():
+        return redirect(url_for("login"))
+
+    content = request.form.get("content", "").strip()
+    movie_title = request.form.get("movie_title", "영화 제목").strip()
+
+    if content:
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO reviews (user_id, movie_id, movie_title, content) VALUES (?, ?, ?, ?)",
+            (session["user_id"], movie_id, movie_title, content)
+        )
+        conn.commit()
+        conn.close()
+
+    return redirect(url_for("movie_detail", movie_id=movie_id, analysis="loading"))
+
+@app.route("/favorite/<int:movie_id>", methods=["POST"])
+def toggle_favorite(movie_id):
+    if not login_required():
+        return redirect(url_for("login"))
+
+    movie_title = request.form.get("movie_title", "영화 제목").strip()
+    poster_path = request.form.get("poster_path", "").strip()
+
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT * FROM favorites WHERE user_id = ? AND movie_id = ?",
+        (session["user_id"], movie_id)
+    ).fetchone()
+
+    if existing:
+        conn.execute(
+            "DELETE FROM favorites WHERE user_id = ? AND movie_id = ?",
+            (session["user_id"], movie_id)
+        )
+    else:
+        conn.execute(
+            "INSERT INTO favorites (user_id, movie_id, movie_title, poster_path, freshness) VALUES (?, ?, ?, ?, ?)",
+            (session["user_id"], movie_id, movie_title, poster_path, "90%")
+        )
+
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("movie_detail", movie_id=movie_id))
 
 @app.route("/my-reviews")
 def my_reviews():
+    if not login_required():
+        return redirect(url_for("login"))
+
     mode = request.args.get("mode", "")
     edit_id = request.args.get("edit_id", "")
     delete_id = request.args.get("delete_id", "")
 
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM reviews WHERE user_id = ? ORDER BY id DESC",
+        (session["user_id"],)
+    ).fetchall()
+    conn.close()
+
     reviews = []
-    for review in dummy_my_reviews:
-        item = review.copy()
-        item["editing"] = str(review["id"]) == edit_id and mode == "edit"
+    for row in rows:
+        item = dict(row)
+        item["title"] = item["movie_title"]
+        item["date"] = item["created_at"][:10]
+        item["editing"] = str(item["id"]) == edit_id and mode == "edit"
         reviews.append(item)
 
     delete_review = None
@@ -331,137 +567,202 @@ def my_reviews():
 
     return render_template(
         "my_reviews.html",
-        nickname="남채은 님",
+        nickname=get_nickname(),
         reviews=reviews,
         delete_review=delete_review
     )
 
-@app.route("/movie-search")
-def movie_search():
-    return redirect(url_for("main"))
+@app.route("/my-reviews/update/<int:review_id>", methods=["POST"])
+def update_review(review_id):
+    if not login_required():
+        return redirect(url_for("login"))
+
+    content = request.form.get("content", "").strip()
+
+    if content:
+        conn = get_db()
+        conn.execute(
+            "UPDATE reviews SET content = ? WHERE id = ? AND user_id = ?",
+            (content, review_id, session["user_id"])
+        )
+        conn.commit()
+        conn.close()
+
+    return redirect(url_for("my_reviews"))
+
+@app.route("/my-reviews/delete/<int:review_id>", methods=["POST"])
+def delete_review(review_id):
+    if not login_required():
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    conn.execute(
+        "DELETE FROM reviews WHERE id = ? AND user_id = ?",
+        (review_id, session["user_id"])
+    )
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("my_reviews"))
 
 @app.route("/dictionary")
 def dictionary():
+    if not login_required():
+        return redirect(url_for("login"))
+
     keyword = request.args.get("q", "").strip()
     selected_category = request.args.get("category", "전체")
 
-    filtered_words = open_dictionary_words[:]
+    query = "SELECT * FROM dictionary_words WHERE 1=1"
+    params = []
 
     if selected_category != "전체":
-        filtered_words = [item for item in filtered_words if item["category"] == selected_category]
+        query += " AND category = ?"
+        params.append(selected_category)
 
     if keyword:
-        filtered_words = [item for item in filtered_words if keyword.lower() in item["word"].lower()]
+        query += " AND word LIKE ?"
+        params.append(f"%{keyword}%")
 
-    filtered_words = sorted(filtered_words, key=lambda x: x["count"], reverse=True)
+    query += " ORDER BY count DESC"
 
-    enriched_words = enrich_dictionary_items(filtered_words)
+    conn = get_db()
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
 
-    for index, item in enumerate(enriched_words, start=1):
-        item["rank"] = index
+    dictionary_words = enrich_dictionary_items(rows)
+
+    for idx, item in enumerate(dictionary_words, start=1):
+        item["rank"] = idx
 
     return render_template(
         "dictionary.html",
-        nickname="남채은 님",
-        dictionary_words=enriched_words,
-        categories=get_category_list(),
+        nickname=get_nickname(),
+        dictionary_words=dictionary_words,
+        categories=["전체", "스토리", "연출", "연기", "몰입도", "음악"],
         selected_category=selected_category,
         keyword=keyword
     )
 
 @app.route("/dictionary/request", methods=["GET", "POST"])
 def dictionary_request():
+    if not login_required():
+        return redirect(url_for("login"))
+
     if request.method == "POST":
         word = request.form.get("word", "").strip()
 
         if word:
-            existing_request = None
-            for item in open_dictionary_requests:
-                if item["word"] == word:
-                    existing_request = item
-                    break
+            conn = get_db()
+            existing = conn.execute(
+                "SELECT * FROM dictionary_requests WHERE word = ?",
+                (word,)
+            ).fetchone()
 
-            if existing_request:
-                existing_request["count"] += 1
-            else:
-                open_dictionary_requests.append(
-                    {
-                        "id": get_next_dictionary_request_id(),
-                        "word": word,
-                        "count": 1
-                    }
+            if existing:
+                conn.execute(
+                    "UPDATE dictionary_requests SET count = count + 1 WHERE word = ?",
+                    (word,)
                 )
+            else:
+                conn.execute(
+                    "INSERT INTO dictionary_requests (word, count) VALUES (?, ?)",
+                    (word, 1)
+                )
+
+            conn.commit()
+            conn.close()
 
         return redirect(url_for("dictionary_request", submitted="1"))
 
-    submitted = request.args.get("submitted", "")
     return render_template(
         "dictionary_request.html",
-        nickname="남채은 님",
-        submitted=submitted
+        nickname=get_nickname(),
+        submitted=request.args.get("submitted", "")
     )
 
 @app.route("/admin/dictionary")
 def dictionary_admin():
-    recent_words = get_recent_registered_words()
+    user = get_current_user()
+
+    if not user or user["is_admin"] != 1:
+        return redirect(url_for("main"))
+
+    conn = get_db()
+    pending_rows = conn.execute(
+        "SELECT * FROM dictionary_requests ORDER BY id DESC"
+    ).fetchall()
+
+    recent_rows = conn.execute(
+        "SELECT * FROM dictionary_words ORDER BY id DESC LIMIT 4"
+    ).fetchall()
+    conn.close()
+
+    recent_words = enrich_dictionary_items(recent_rows)
 
     return render_template(
         "dictionary_admin.html",
-        pending_requests=open_dictionary_requests,
+        pending_requests=[dict(row) for row in pending_rows],
         recent_words=recent_words,
-        pending_count=len(open_dictionary_requests),
+        pending_count=len(pending_rows),
         categories=["스토리", "연출", "연기", "몰입도", "음악"]
     )
 
 @app.route("/admin/dictionary/action", methods=["POST"])
 def dictionary_admin_action():
-    action = request.form.get("action", "").strip()
-    request_id = request.form.get("request_id", "").strip()
+    user = get_current_user()
 
-    if not request_id:
-        return redirect(url_for("dictionary_admin"))
+    if not user or user["is_admin"] != 1:
+        return redirect(url_for("main"))
 
-    target_request = None
-    for item in open_dictionary_requests:
-        if str(item["id"]) == request_id:
-            target_request = item
-            break
+    action = request.form.get("action", "")
+    request_id = request.form.get("request_id", "")
+    category = request.form.get("category", "")
+    sentiment = request.form.get("sentiment", "")
 
-    if not target_request:
+    conn = get_db()
+    target = conn.execute(
+        "SELECT * FROM dictionary_requests WHERE id = ?",
+        (request_id,)
+    ).fetchone()
+
+    if not target:
+        conn.close()
         return redirect(url_for("dictionary_admin"))
 
     if action == "approve":
-        category = request.form.get("category", "").strip()
-        sentiment = request.form.get("sentiment", "").strip()
+        existing = conn.execute(
+            "SELECT * FROM dictionary_words WHERE word = ? AND category = ? AND sentiment = ?",
+            (target["word"], category, sentiment)
+        ).fetchone()
 
-        if not category or not sentiment:
-            return redirect(url_for("dictionary_admin"))
-
-        existing_word = None
-        for item in open_dictionary_words:
-            if item["word"] == target_request["word"] and item["category"] == category and item["sentiment"] == sentiment:
-                existing_word = item
-                break
-
-        if existing_word:
-            existing_word["count"] += target_request["count"]
+        if existing:
+            conn.execute(
+                "UPDATE dictionary_words SET count = count + ? WHERE id = ?",
+                (target["count"], existing["id"])
+            )
         else:
-            open_dictionary_words.append(
-                {
-                    "id": get_next_dictionary_word_id(),
-                    "word": target_request["word"],
-                    "category": category,
-                    "sentiment": sentiment,
-                    "count": target_request["count"]
-                }
+            conn.execute(
+                "INSERT INTO dictionary_words (word, category, sentiment, count) VALUES (?, ?, ?, ?)",
+                (target["word"], category, sentiment, target["count"])
             )
 
-        open_dictionary_requests.remove(target_request)
+        conn.execute(
+            "DELETE FROM dictionary_requests WHERE id = ?",
+            (request_id,)
+        )
 
     elif action == "reject":
-        open_dictionary_requests.remove(target_request)
+        conn.execute(
+            "DELETE FROM dictionary_requests WHERE id = ?",
+            (request_id,)
+        )
+
+    conn.commit()
+    conn.close()
 
     return redirect(url_for("dictionary_admin"))
 
 if __name__ == "__main__":
+    init_db()
     app.run(debug=True)
