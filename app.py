@@ -636,15 +636,17 @@ def movie_detail(movie_id):
 
     conn.close()
 
-    personal_analysis_result = None
-    if user_review:
-        personal_analysis_result = simple_analyze_review(user_review["content"])
-
-    all_review_content = " ".join([row["content"] for row in other_reviews])
-
     analysis_result = None
-    if all_review_content:
-        analysis_result = simple_analyze_review(all_review_content)
+    personal_analysis_result = None
+
+    if request.args.get("analysis") == "result":
+        all_review_content = " ".join([row["content"] for row in other_reviews])
+
+        if all_review_content:
+            analysis_result = simple_analyze_review(all_review_content)
+
+        if request.args.get("personal") == "1" and user_review:
+            personal_analysis_result = simple_analyze_review(user_review["content"])
 
     return render_template(
         "movie_detail.html",
