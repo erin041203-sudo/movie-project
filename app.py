@@ -640,13 +640,9 @@ def movie_detail(movie_id):
     personal_analysis_result = None
 
     if request.args.get("analysis") == "result":
-        all_review_content = " ".join([row["content"] for row in other_reviews])
-
-        if all_review_content:
-            analysis_result = simple_analyze_review(all_review_content)
-
-        if request.args.get("personal") == "1" and user_review:
-            personal_analysis_result = simple_analyze_review(user_review["content"])
+    if request.args.get("personal") == "1" and user_review:
+        personal_analysis_result = simple_analyze_review(user_review["content"])
+        analysis_result = personal_analysis_result
 
     return render_template(
         "movie_detail.html",
