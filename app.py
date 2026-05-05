@@ -4,6 +4,11 @@ import sqlite3
 import os
 import random
 import bcrypt
+import json
+from konlpy.tag import Okt
+okt = Okt()
+
+print("파일 로딩됨")
 
 app = Flask(__name__)
 app.secret_key = "movie-review-secret"
@@ -211,6 +216,165 @@ def get_sentiment_class(sentiment):
     if sentiment == "긍정":
         return "positive"
     return "negative"
+
+def load_sentiment_dictionary():
+    with open("SentiWord_info.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    sentiment_dict = []
+
+    for item in data:
+        word = item.get("word")
+        polarity = int(item.get("polarity"))
+
+        sentiment_dict.append({
+            "word": word,
+            "polarity": polarity
+        })
+
+    return sentiment_dict
+
+SENTIMENT_DICTIONARY = load_sentiment_dictionary()
+
+def match_sentiment_words(content):
+    matched_words = []
+
+    tokens = okt.morphs(content)
+    search_text = content + " " + " ".join(tokens)
+
+    for item in SENTIMENT_DICTIONARY:
+        word = item["word"]
+
+        if word in search_text:
+            matched_words.append({
+                "word": word,
+                "polarity": item["polarity"],
+                "count": search_text.count(word)
+            })
+
+    return matched_words
+
+def simple_analyze_review(content):
+    matched_words = match_sentiment_words(content)
+
+    positive = 0
+    negative = 0
+
+    for item in matched_words:
+        if item["polarity"] > 0:
+            positive += item["count"]
+        elif item["polarity"] < 0:
+            negative += item["count"]
+
+    if positive > negative:
+        result = "긍정"
+    elif negative > positive:
+        result = "부정"
+    else:
+        result = "중립"
+
+    return {
+        "sentiment_result": result,
+        "positive_count": positive,
+        "negative_count": negative,
+        "matched_words": matched_words
+    }
+
+def analyze_review_with_sentiment_dict(content):
+    matched_words = match_sentiment_words(content)
+
+    positive_score = 0
+    negative_score = 0
+
+    for item in matched_words:
+        score = item["polarity"] * item["count"]
+
+        if score > 0:
+            positive_score += score
+        elif score < 0:
+            negative_score += abs(score)
+
+    total = positive_score + negative_score
+
+    if total == 0:
+        sentiment_result = "중립"
+        positive_percent = 0
+        negative_percent = 0
+    else:
+        positive_percent = round((positive_score / total) * 100, 1)
+        negative_percent = round((negative_score / total) * 100, 1)
+
+        if positive_score > negative_score:
+            sentiment_result = "긍정"
+        elif negative_score > positive_score:
+            sentiment_result = "부정"
+        else:
+            sentiment_result = "중립"
+
+    return {
+        "sentiment_result": sentiment_result,
+        "positive_count": positive_score,
+        "negative_count": negative_score,
+        "positive_percent": positive_percent,
+        "negative_percent": negative_percent,
+        "top_categories": [],
+        "matched_words": matched_words
+    }
+
+print("함수 정의됨")
+
+def analyze_review(content):
+    conn = get_db()
+    words = conn.execute("SELECT * FROM dictionary_words").fetchall()
+    conn.close()
+
+    category_counts = {}
+    positive_count = 0
+    negative_count = 0
+    matched_words = []
+
+    for row in words:
+        word = row["word"]
+        category = row["category"]
+        sentiment = row["sentiment"]
+
+        if word in content:
+            count = content.count(word)
+
+            category_counts[category] = category_counts.get(category, 0) + count
+
+            if sentiment == "긍정":
+                positive_count += count
+            else:
+                negative_count += count
+
+            matched_words.append({
+                "word": word,
+                "category": category,
+                "sentiment": sentiment,
+                "count": count
+            })
+
+    top_categories = sorted(
+        category_counts.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )[:3]
+
+    if positive_count > negative_count:
+        sentiment_result = "긍정"
+    elif negative_count > positive_count:
+        sentiment_result = "부정"
+    else:
+        sentiment_result = "중립"
+
+    return {
+        "sentiment_result": sentiment_result,
+        "positive_count": positive_count,
+        "negative_count": negative_count,
+        "top_categories": top_categories,
+        "matched_words": matched_words
+    }
 
 def enrich_dictionary_items(rows):
     items = []
@@ -445,18 +609,8 @@ def movie_detail(movie_id):
 
     movie = tmdb_get(f"/movie/{movie_id}", {"language": "ko-KR"})
 
-    if not movie:
-        movie = {
-            "id": movie_id,
-            "title": "영화 제목",
-            "release_date": "2024-01-01",
-            "vote_average": 7.9,
-            "overview": "영화 줄거리가 표시됩니다.",
-            "poster_path": None,
-            "genres": [{"name": "드라마"}, {"name": "스릴러"}]
-        }
-
     conn = get_db()
+
     user_review = conn.execute(
         "SELECT * FROM reviews WHERE user_id = ? AND movie_id = ? ORDER BY id DESC LIMIT 1",
         (session["user_id"], movie_id)
@@ -474,15 +628,27 @@ def movie_detail(movie_id):
 
     conn.close()
 
+    personal_analysis_result = None
+    if user_review:
+        personal_analysis_result = simple_analyze_review(user_review["content"])
+
+    all_review_content = " ".join([row["content"] for row in other_reviews])
+
+    analysis_result = None
+    if all_review_content:
+        analysis_result = simple_analyze_review(all_review_content)
+
     return render_template(
         "movie_detail.html",
+        analysis_result=analysis_result,
         nickname=get_nickname(),
         movie=movie,
         image_base_url=IMAGE_BASE_URL,
         analysis_mode=request.args.get("analysis", "result"),
         user_review=user_review,
         other_reviews=other_reviews,
-        favorite=favorite
+        favorite=favorite,
+        personal_analysis_result=personal_analysis_result
     )
 
 @app.route("/movie/<int:movie_id>/review", methods=["POST"])
@@ -494,6 +660,9 @@ def submit_review(movie_id):
     movie_title = request.form.get("movie_title", "영화 제목").strip()
 
     if content:
+        matched_words = match_sentiment_words(content)
+        print("외부 감성사전 매칭 결과:", matched_words)
+        
         conn = get_db()
         conn.execute(
             "INSERT INTO reviews (user_id, movie_id, movie_title, content) VALUES (?, ?, ?, ?)",
@@ -502,7 +671,7 @@ def submit_review(movie_id):
         conn.commit()
         conn.close()
 
-    return redirect(url_for("movie_detail", movie_id=movie_id, analysis="loading"))
+    return redirect(url_for("movie_detail", movie_id=movie_id, analysis="result", personal=1))
 
 @app.route("/favorite/<int:movie_id>", methods=["POST"])
 def toggle_favorite(movie_id):

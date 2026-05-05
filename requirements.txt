@@ -2,3 +2,5 @@ flask
 requests
 gunicorn
 bcrypt
+konlpy
+jpype1

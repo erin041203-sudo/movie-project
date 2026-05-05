@@ -59,10 +59,16 @@
                 <section class="review-write-section">
                     <h2>리뷰 작성</h2>
                     <div class="section-divider"></div>
-                    <textarea placeholder="리뷰를 작성해주세요... (최소 10자)"></textarea>
-                    <div class="write-btn-row">
-                        <a href="/movie/{{ movie.id }}?analysis=loading" class="btn btn-primary">리뷰 등록</a>
-                    </div>
+
+                    <form action="/movie/{{ movie.id }}/review" method="POST">
+                        <textarea name="content" placeholder="리뷰를 작성해주세요... (최소 10자)"></textarea>
+
+                        <input type="hidden" name="movie_title" value="{{ movie.title }}">
+
+                        <div class="write-btn-row">
+                            <button type="submit" class="btn btn-primary">리뷰 등록</button>
+                        </div>
+                    </form>
                 </section>
 
                 {% if analysis_mode == "loading" %}
@@ -72,6 +78,11 @@
                         <div class="spinner"></div>
                         <p>리뷰를 분석하고 있습니다.<br>잠시 후 결과가 자동으로 표시됩니다.</p>
                         <a href="/movie/{{ movie.id }}?analysis=result" class="hidden-jump">결과 보기</a>
+                        <script>
+                            setTimeout(function () {
+                                window.location.href = "/movie/{{ movie.id }}?analysis=result&personal=1";
+                            }, 1500);
+                        </script>
                     </div>
 
                     <div class="analysis-card">
@@ -83,22 +94,21 @@
                 <section class="analysis-grid">
                     <div class="analysis-card">
                         <h3>분석 결과</h3>
-                        <div class="analysis-result-box">
-                            <div class="radar-placeholder">
-                                <div class="radar-shape"></div>
-                                <div class="radar-label top">스토리</div>
-                                <div class="radar-label right-top">연기</div>
-                                <div class="radar-label right-bottom">연출</div>
-                                <div class="radar-label left-bottom">음악</div>
-                                <div class="radar-label left-top">몰입도</div>
-                            </div>
-                            <div class="score-box">
-                                <div class="score-big">4.4</div>
-                                <div class="score-text">평균점수</div>
-                                <div class="fresh-big">95%</div>
-                                <div class="score-text">신선도 지수</div>
-                            </div>
-                        </div>
+                        {% if analysis_result %}
+                            <p>감정 분석: <strong>{{ analysis_result.sentiment_result }}</strong></p>
+                            <p>긍정: {{ analysis_result.positive_count }} / 부정: {{ analysis_result.negative_count }}</p>
+
+                            <h4>키워드</h4>
+                            {% if analysis_result.matched_words %}
+                                {% for item in analysis_result.matched_words %}
+                                    <span>{{ item.word }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <p>매칭된 단어 없음</p>
+                            {% endif %}
+                        {% else %}
+                            <p>아직 분석할 리뷰가 없습니다.</p>
+                        {% endif %}
                     </div>
 
                     <div class="analysis-card">
@@ -122,9 +132,9 @@
                         </div>
 
                         <div class="review-center">
-                            <div class="review-name">{{ review.name }}</div>
+                            <div class="review-name">{{ review.nickname }}</div>
                             <div class="review-content">{{ review.content }}</div>
-                            <div class="review-date">{{ review.date }}</div>
+                            <div class="review-date">{{ review.created_at[:10] }}</div>
                         </div>
 
                         <div class="review-right">
@@ -137,5 +147,35 @@
             </main>
         </div>
     </div>
+    {% if request.args.get("personal") == "1" and personal_analysis_result %}
+<div class="modal-backdrop">
+    <div class="analysis-modal">
+        <h2>내 리뷰 분석 결과</h2>
+
+        <p>감정 분석: <strong>{{ personal_analysis_result.sentiment_result }}</strong></p>
+        <p>긍정: {{ personal_analysis_result.positive_count }} / 부정: {{ personal_analysis_result.negative_count }}</p>
+
+        <h4>키워드</h4>
+        {% if personal_analysis_result.matched_words %}
+            <div class="keyword-list">
+                {% for item in personal_analysis_result.matched_words %}
+                    <span class="keyword-tag">{{ item.word }}</span>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>매칭된 단어 없음</p>
+        {% endif %}
+
+        <button type="button" class="btn btn-primary" onclick="closeAnalysisModal()">확인</button>
+    </div>
+</div>
+
+<script>
+    function closeAnalysisModal() {
+        document.querySelector(".modal-backdrop").style.display = "none";
+        history.replaceState(null, "", "/movie/{{ movie.id }}?analysis=result");
+    }
+</script>
+{% endif %}
 </body>
 </html>
