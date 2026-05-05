@@ -5,6 +5,14 @@ import os
 import random
 import bcrypt
 import json
+
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+RENDER_JAVA_HOME = os.path.join(PROJECT_ROOT, ".jdk")
+
+if os.path.exists(RENDER_JAVA_HOME):
+    os.environ["JAVA_HOME"] = RENDER_JAVA_HOME
+    os.environ["PATH"] = os.path.join(RENDER_JAVA_HOME, "bin") + os.pathsep + os.environ.get("PATH", "")
+
 from konlpy.tag import Okt
 okt = Okt()
 
