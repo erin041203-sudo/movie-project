@@ -747,13 +747,17 @@ def movie_detail(movie_id):
     visual_analysis = None
     summary_text = ""
 
-    if user_review:
-        personal_analysis_result = analyze_review(user_review["content"])
-        analysis_result = personal_analysis_result
+    all_review_text = " ".join([row["content"] for row in other_reviews])
+
+    if all_review_text:
+        analysis_result = analyze_review(all_review_text)
         visual_analysis = build_visual_analysis(analysis_result)
         summary_text = build_summary_text(analysis_result)
 
-    return render_template(
+    if user_review:
+        personal_analysis_result = analyze_review(user_review["content"])
+
+        return render_template(
         "movie_detail.html",
         analysis_result=analysis_result,
         nickname=get_nickname(),
