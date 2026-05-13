@@ -94,36 +94,82 @@
                 <section class="analysis-grid">
                     <div class="analysis-card">
                         <h3>분석 결과</h3>
-                        {% if analysis_result %}
-                            <p>감정 분석: <strong>{{ analysis_result.sentiment_result }}</strong></p>
-                            <p>긍정: {{ analysis_result.positive_count }} / 부정: {{ analysis_result.negative_count }}</p>
 
-                            <h4>키워드</h4>
-                            {% if analysis_result.matched_words %}
-                                {% for item in analysis_result.matched_words %}
-                                    <span>{{ item.word }}</span>
-                                {% endfor %}
-                            {% else %}
-                                <p>매칭된 단어 없음</p>
-                            {% endif %}
+                        {% if analysis_result and visual_analysis %}
+                        <div class="analysis-result-box">
+                            <div class="radar-chart-wrap">
+                                <svg class="radar-chart" viewBox="0 0 220 180">
+                                    <polygon points="110,28 169,71 146,141 74,141 51,71" class="radar-grid" transform="translate(12,0)"></polygon>
+                                    <polygon points="110,50 148,78 134,124 86,124 72,78" class="radar-grid inner" transform="translate(12,0)"></polygon>
+                                    <line x1="110" y1="90" x2="110" y2="28" class="radar-line" transform="translate(12,0)"></line>
+                                    <line x1="110" y1="90" x2="169" y2="71" class="radar-line" transform="translate(12,0)"></line>
+                                    <line x1="110" y1="90" x2="146" y2="141" class="radar-line" transform="translate(12,0)"></line>
+                                    <line x1="110" y1="90" x2="74" y2="141" class="radar-line" transform="translate(12,0)"></line>
+                                    <line x1="110" y1="90" x2="51" y2="71" class="radar-line" transform="translate(12,0)"></line>
+                                    <polygon points="{{ visual_analysis.radar_points }}" class="radar-data" transform="translate(12,0)"></polygon>
+                                    
+                                </svg>
+
+                                <span class="radar-label top">스토리</span>
+                                <span class="radar-label right-top">연기</span>
+                                <span class="radar-label right-bottom">연출</span>
+                                <span class="radar-label left-bottom">음악</span>
+                                <span class="radar-label left-top">몰입도</span>
+                            </div>
+
+                            <div class="score-box">
+                                <div class="score-big">4.4</div>
+                                <div class="score-text">평균점수</div>
+                                <div class="fresh-big">
+                                    {% if analysis_result.sentiment_result == "긍정" %}
+                                    95%
+                                    {% elif analysis_result.sentiment_result == "부정" %}
+                                    42%
+                                    {% else %}
+                                    70%
+                                    {% endif %}
+                                </div>
+                                <div class="score-text">신선도 지수</div>
+                            </div>
+                        </div>
                         {% else %}
-                            <p>아직 분석할 리뷰가 없습니다.</p>
+                        <p>아직 분석할 리뷰가 없습니다.</p>
                         {% endif %}
                     </div>
 
                     <div class="analysis-card">
                         <h3>종합 요약</h3>
                         <div class="analysis-summary-text">
-                            이 영화는 <strong>연기</strong> 부문에서 [황정민, 열연, 몰입감]이라는 평이 많았고,
-                            <strong>스토리</strong> 부문에서 [긴장감, 실화, 역사]에 대한 언급이 많았으며,
-                            <strong>연출</strong> 부문에서 [속도감, 묘사]에 관한 평가가 두드러졌습니다.
+                            {{ summary_text }}
                         </div>
+                    </div>
+                </section>
+                {% endif %}
+                
+                {% if visual_analysis and visual_analysis.keyword_cards %}
+                <section class="keyword-card-section">
+                    <h3>🏷 키워드 카드</h3>
+
+                    <div class="keyword-card-grid">
+                        {% for card in visual_analysis.keyword_cards %}
+                        <div class="keyword-category-card">
+                            <div class="keyword-category-title">{{ card.category }}</div>
+
+                            {% for word in card.positive %}
+                            <div class="keyword-chip positive">👍 {{ word }}</div>
+                            {% endfor %}
+
+                            {% for word in card.negative %}
+                            <div class="keyword-chip negative">👎 {{ word }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
                     </div>
                 </section>
                 {% endif %}
 
                 <section class="user-review-section">
-                    <h2>사용자 리뷰</h2>
+                    <h2>사용자 리뷰 <span class="review-count">{{ other_reviews|length }}</span></h2>
 
                     {% for review in other_reviews %}
                     <div class="review-card">
@@ -147,35 +193,11 @@
             </main>
         </div>
     </div>
-    {% if request.args.get("personal") == "1" and personal_analysis_result %}
-<div class="modal-backdrop">
-    <div class="analysis-modal">
-        <h2>내 리뷰 분석 결과</h2>
-
-        <p>감정 분석: <strong>{{ personal_analysis_result.sentiment_result }}</strong></p>
-        <p>긍정: {{ personal_analysis_result.positive_count }} / 부정: {{ personal_analysis_result.negative_count }}</p>
-
-        <h4>키워드</h4>
-        {% if personal_analysis_result.matched_words %}
-            <div class="keyword-list">
-                {% for item in personal_analysis_result.matched_words %}
-                    <span class="keyword-tag">{{ item.word }}</span>
-                {% endfor %}
-            </div>
-        {% else %}
-            <p>매칭된 단어 없음</p>
-        {% endif %}
-
-        <button type="button" class="btn btn-primary" onclick="closeAnalysisModal()">확인</button>
-    </div>
-</div>
-
-<script>
-    function closeAnalysisModal() {
-        document.querySelector(".modal-backdrop").style.display = "none";
+    {% if request.args.get("open_personal") == "1" %}
+    <script>
+        window.open("/movie/{{ movie.id }}/my-analysis", "_blank");
         history.replaceState(null, "", "/movie/{{ movie.id }}?analysis=result");
-    }
-</script>
-{% endif %}
+    </script>
+    {% endif %}
 </body>
 </html>

@@ -1683,3 +1683,250 @@ a {
     background: #f0f3f8;
     font-size: 14px;
 }
+
+.radar-chart-wrap {
+    width: 240px;
+    height: 180px;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.radar-chart {
+    width: 220px;
+    height: 180px;
+}
+
+.radar-grid {
+    fill: rgba(47, 110, 229, 0.04);
+    stroke: #cfd8ff;
+    stroke-width: 1;
+}
+
+.radar-grid.inner {
+    fill: none;
+}
+
+.radar-line {
+    stroke: #e1e5f5;
+    stroke-width: 1;
+}
+
+.radar-data {
+    fill: rgba(47, 110, 229, 0.18);
+    stroke: #514ee8;
+    stroke-width: 2;
+}
+
+.keyword-card-section {
+    background: #fff;
+    border: 1px solid #d7d7d7;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 24px;
+}
+
+.keyword-card-section h3 {
+    font-size: 24px;
+    font-weight: 800;
+    margin-bottom: 16px;
+}
+
+.keyword-card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.keyword-category-title {
+    font-size: 16px;
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+
+.keyword-chip {
+    min-height: 34px;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.keyword-chip.positive {
+    background: #e7f1dc;
+    color: #4f7834;
+}
+
+.keyword-chip.negative {
+    background: #fde7e7;
+    color: #c04d4d;
+}
+
+@media (max-width: 768px) {
+    .analysis-result-box {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .keyword-card-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.analysis-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    align-items: stretch;
+}
+
+.analysis-card {
+    min-height: 230px;
+}
+
+.analysis-result-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 160px;
+}
+
+.review-count {
+    font-size: 20px;
+    color: #777;
+    margin-left: 8px;
+}
+
+.radar-label {
+    white-space: nowrap;
+    width: auto;
+    line-height: 1;
+}
+
+.radar-label.top {
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.radar-label.right-top {
+    right: -4px;
+    top: 48px;
+}
+
+.radar-label.right-bottom {
+    right: 8px;
+    bottom: 30px;
+}
+
+.radar-label.left-bottom {
+    left: 12px;
+    bottom: 30px;
+}
+
+.radar-label.left-top {
+    left: 4px;
+    top: 48px;
+}
+
+.personal-analysis-page {
+    min-height: calc(100vh - 38px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+}
+
+.personal-analysis-card {
+    width: 460px;
+}
+
+.personal-analysis-container {
+    width: 100%;
+    max-width: 1100px;
+}
+
+.personal-analysis-header {
+    margin-bottom: 24px;
+}
+
+.personal-analysis-header h1 {
+    font-size: 42px;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.personal-analysis-header p {
+    color: #666;
+    font-size: 16px;
+}
+
+.personal-analysis-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.personal-keyword-card {
+    min-height: 320px;
+}
+
+.detected-keyword-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.detected-keyword-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #f5f7fb;
+}
+
+.detected-word {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.detected-meta {
+    font-size: 14px;
+    color: #666;
+}
+
+.personal-review-card {
+    margin-top: 6px;
+}
+
+.personal-review-content {
+    font-size: 16px;
+    line-height: 1.8;
+    color: #444;
+}
+
+@media (max-width: 900px) {
+    .personal-analysis-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.personal-analysis-card .analysis-result-box {
+    justify-content: center;
+    gap: 34px;
+}
+
+.personal-analysis-card .radar-chart-wrap {
+    margin-left: 24px;
+}
+
+.analysis-card .analysis-result-box {
+    justify-content: center;
+    gap: 34px;
+}
+
+.analysis-card .radar-chart-wrap {
+    margin-left: 18px;
+}

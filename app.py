@@ -229,16 +229,14 @@ def load_sentiment_dictionary():
     with open("SentiWord_info.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    sentiment_dict = []
+    sentiment_dict = {}
 
     for item in data:
         word = item.get("word")
-        polarity = int(item.get("polarity"))
+        polarity = item.get("polarity")
 
-        sentiment_dict.append({
-            "word": word,
-            "polarity": polarity
-        })
+        if word and polarity:
+            sentiment_dict[word] = int(polarity)
 
     return sentiment_dict
 
@@ -248,16 +246,14 @@ def match_sentiment_words(content):
     matched_words = []
 
     tokens = okt.morphs(content)
-    search_text = content + " " + " ".join(tokens)
+    candidates = set(tokens + content.split())
 
-    for item in SENTIMENT_DICTIONARY:
-        word = item["word"]
-
-        if word in search_text:
+    for word in candidates:
+        if word in SENTIMENT_DICTIONARY:
             matched_words.append({
                 "word": word,
-                "polarity": item["polarity"],
-                "count": search_text.count(word)
+                "polarity": SENTIMENT_DICTIONARY[word],
+                "count": tokens.count(word) + content.split().count(word)
             })
 
     return matched_words
@@ -383,6 +379,116 @@ def analyze_review(content):
         "top_categories": top_categories,
         "matched_words": matched_words
     }
+
+def build_visual_analysis(analysis_result):
+    categories = ["스토리", "연기", "연출", "몰입도", "음악"]
+    category_scores = {category: 0 for category in categories}
+    keyword_cards = {category: {"positive": [], "negative": []} for category in categories}
+
+    if analysis_result and analysis_result.get("matched_words"):
+        for item in analysis_result["matched_words"]:
+            category = item.get("category")
+            sentiment = item.get("sentiment")
+            word = item.get("word")
+            count = item.get("count", 1)
+
+            if category in category_scores:
+                category_scores[category] += count
+
+            if category in keyword_cards and word:
+                if sentiment == "긍정":
+                    keyword_cards[category]["positive"].append(word)
+                else:
+                    keyword_cards[category]["negative"].append(word)
+
+    max_count = max(category_scores.values()) if category_scores else 0
+
+    radar_values = []
+    for category in categories:
+        if max_count == 0:
+            score = 30
+        else:
+            score = max(30, round((category_scores[category] / max_count) * 100))
+        radar_values.append(score)
+
+    radar_points = []
+    center_x = 110
+    center_y = 90
+    radius = 62
+
+    for i, value in enumerate(radar_values):
+        angle = -90 + (360 / len(categories)) * i
+        rad = angle * 3.141592 / 180
+        point_radius = radius * value / 100
+        x = center_x + point_radius * __import__("math").cos(rad)
+        y = center_y + point_radius * __import__("math").sin(rad)
+        radar_points.append(f"{round(x, 1)},{round(y, 1)}")
+
+    top_card_categories = [
+        category for category in sorted(
+            categories,
+            key=lambda category: category_scores[category],
+            reverse=True
+        )
+        if category_scores[category] > 0
+    ][:3]
+
+    visible_keyword_cards = []
+
+    for category in top_card_categories:
+        positives = keyword_cards[category]["positive"][:3]
+        negatives = keyword_cards[category]["negative"][:2]
+
+        visible_keyword_cards.append({
+            "category": category,
+            "positive": positives,
+            "negative": negatives
+        })
+
+    return {
+        "categories": categories,
+        "radar_points": " ".join(radar_points),
+        "keyword_cards": visible_keyword_cards
+    }
+
+def build_summary_text(analysis_result):
+    if not analysis_result or not analysis_result.get("matched_words"):
+        return "아직 분석된 키워드가 부족하여 종합 요약을 생성할 수 없습니다."
+
+    category_words = {}
+
+    for item in analysis_result["matched_words"]:
+        category = item.get("category")
+        word = item.get("word")
+        count = item.get("count", 1)
+
+        if not category or not word:
+            continue
+
+        if category not in category_words:
+            category_words[category] = []
+
+        category_words[category].append({
+            "word": word,
+            "count": count
+        })
+
+    sorted_categories = sorted(
+        category_words.items(),
+        key=lambda x: sum(item["count"] for item in x[1]),
+        reverse=True
+    )[:3]
+
+    parts = []
+
+    for category, words in sorted_categories:
+        sorted_words = sorted(words, key=lambda x: x["count"], reverse=True)
+        top_words = [item["word"] for item in sorted_words[:3]]
+        word_text = ", ".join(top_words)
+
+        parts.append(f"{category} 부문에서 [{word_text}]에 대한 언급이 많았습니다")
+
+    return "이 영화는 " + ", ".join(parts) + "."
 
 def enrich_dictionary_items(rows):
     items = []
@@ -638,11 +744,14 @@ def movie_detail(movie_id):
 
     analysis_result = None
     personal_analysis_result = None
+    visual_analysis = None
+    summary_text = ""
 
-    if request.args.get("analysis") == "result":
-        if request.args.get("personal") == "1" and user_review:
-            personal_analysis_result = simple_analyze_review(user_review["content"])
-            analysis_result = personal_analysis_result
+    if user_review:
+        personal_analysis_result = analyze_review(user_review["content"])
+        analysis_result = personal_analysis_result
+        visual_analysis = build_visual_analysis(analysis_result)
+        summary_text = build_summary_text(analysis_result)
 
     return render_template(
         "movie_detail.html",
@@ -654,7 +763,9 @@ def movie_detail(movie_id):
         user_review=user_review,
         other_reviews=other_reviews,
         favorite=favorite,
-        personal_analysis_result=personal_analysis_result
+        personal_analysis_result=personal_analysis_result,
+        visual_analysis=visual_analysis,
+        summary_text=summary_text
     )
 
 @app.route("/movie/<int:movie_id>/review", methods=["POST"])
@@ -666,8 +777,6 @@ def submit_review(movie_id):
     movie_title = request.form.get("movie_title", "영화 제목").strip()
 
     if content:
-        matched_words = match_sentiment_words(content)
-        print("외부 감성사전 매칭 결과:", matched_words)
         
         conn = get_db()
         conn.execute(
@@ -677,7 +786,34 @@ def submit_review(movie_id):
         conn.commit()
         conn.close()
 
-    return redirect(url_for("movie_detail", movie_id=movie_id, analysis="result", personal=1))
+    return redirect(url_for("movie_detail", movie_id=movie_id, analysis="result", open_personal=1))
+
+@app.route("/movie/<int:movie_id>/my-analysis")
+def my_analysis(movie_id):
+    if not login_required():
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    user_review = conn.execute(
+        "SELECT * FROM reviews WHERE user_id = ? AND movie_id = ? ORDER BY id DESC LIMIT 1",
+        (session["user_id"], movie_id)
+    ).fetchone()
+    conn.close()
+
+    analysis_result = None
+    visual_analysis = None
+
+    if user_review:
+        analysis_result = analyze_review(user_review["content"])
+        visual_analysis = build_visual_analysis(analysis_result)
+
+    return render_template(
+        "my_analysis.html",
+        analysis_result=analysis_result,
+        visual_analysis=visual_analysis,
+        movie_id=movie_id,
+        user_review=user_review
+)
 
 @app.route("/favorite/<int:movie_id>", methods=["POST"])
 def toggle_favorite(movie_id):

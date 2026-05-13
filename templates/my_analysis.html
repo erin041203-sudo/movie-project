@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>내 리뷰 분석 결과</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="window-frame">
+        <div class="window-bar"></div>
+
+        <main class="personal-analysis-page">
+            <div class="personal-analysis-container">
+
+                <div class="personal-analysis-header">
+                    <h1>내 리뷰 분석 결과</h1>
+                    <p>방금 작성한 리뷰를 기준으로 감정과 키워드를 분석했습니다.</p>
+                </div>
+
+                <div class="personal-analysis-grid">
+
+                    <div class="analysis-card personal-analysis-card">
+                        <h3>분석 결과</h3>
+
+                        {% if analysis_result and visual_analysis %}
+                        <div class="analysis-result-box">
+                            <div class="radar-chart-wrap">
+                                <svg class="radar-chart" viewBox="0 0 220 180">
+                                    <polygon points="110,28 169,71 146,141 74,141 51,71" class="radar-grid" transform="translate(12,0)"></polygon>
+                                    <polygon points="110,50 148,78 134,124 86,124 72,78" class="radar-grid inner" transform="translate(12,0)"></polygon>
+
+                                    <line x1="110" y1="90" x2="110" y2="28" class="radar-line" transform="translate(12,0)"></line>
+                                    <line x1="110" y1="90" x2="169" y2="71" class="radar-line" transform="translate(12,0)"></line>
+                                    <line x1="110" y1="90" x2="146" y2="141" class="radar-line" transform="translate(12,0)"></line>
+                                    <line x1="110" y1="90" x2="74" y2="141" class="radar-line" transform="translate(12,0)"></line>
+                                    <line x1="110" y1="90" x2="51" y2="71" class="radar-line" transform="translate(12,0)"></line>
+
+                                    <polygon points="{{ visual_analysis.radar_points }}" class="radar-data" transform="translate(12,0)"></polygon>
+                                </svg>
+
+                                <span class="radar-label top">스토리</span>
+                                <span class="radar-label right-top">연기</span>
+                                <span class="radar-label right-bottom">연출</span>
+                                <span class="radar-label left-bottom">음악</span>
+                                <span class="radar-label left-top">몰입도</span>
+                            </div>
+
+                            <div class="score-box">
+                                <div class="score-big">4.4</div>
+                                <div class="score-text">평균점수</div>
+
+                                <div class="fresh-big">
+                                    {% if analysis_result.sentiment_result == "긍정" %}
+                                    95%
+                                    {% elif analysis_result.sentiment_result == "부정" %}
+                                    42%
+                                    {% else %}
+                                    70%
+                                    {% endif %}
+                                </div>
+
+                                <div class="score-text">신선도 지수</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="analysis-card personal-keyword-card">
+                        <h3>감지된 키워드</h3>
+
+                        {% if analysis_result.matched_words %}
+                            <div class="detected-keyword-list">
+                                {% for item in analysis_result.matched_words %}
+                                <div class="detected-keyword-item">
+                                    <span class="detected-word">{{ item.word }}</span>
+
+                                    <span class="detected-meta">
+                                        {{ item.category }} · {{ item.count }}회
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p>감지된 키워드가 없습니다.</p>
+                        {% endif %}
+                    </div>
+
+                </div>
+
+                <div class="analysis-card personal-review-card">
+                    <h3>분석 대상 리뷰</h3>
+
+                    <div class="personal-review-content">
+                        {{ user_review.content }}
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</body>
+</html>
