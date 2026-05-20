@@ -1930,3 +1930,27 @@ a {
 .analysis-card .radar-chart-wrap {
     margin-left: 18px;
 }
+
+.external-analysis-notice {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #eef4ff;
+    color: #2f5fb3;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.external-review-card {
+    background: #f8fbff;
+    border-color: #cfe0ff;
+}
+
+.external-review-card .avatar {
+    background: #eef4ff;
+    color: #2f5fb3;
+}
+
+.external-review-card .review-name {
+    color: #2f5fb3;
+}

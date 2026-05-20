@@ -94,6 +94,21 @@
                 <section class="analysis-grid">
                     <div class="analysis-card">
                         <h3>분석 결과</h3>
+                        
+                        {% if analysis_source == "external" %}
+                        <div class="external-analysis-notice">
+                            {% if external_info.review_count > 0 %}
+                            사용자 리뷰가 아직 부족하여 키노라이츠 외부 리뷰 {{ external_info.review_count }}개를 기반으로 분석했습니다.
+                            {% else %}
+                            키노라이츠 리뷰 페이지에는 접근했지만 실제 리뷰 텍스트를 수집하지 못했습니다.
+                            {% endif %}
+                            {% if external_info.from_cache %}
+                            저장된 분석 결과를 사용했습니다.
+                            {% else %}
+                            새로 수집한 리뷰를 분석했습니다.
+                            {% endif %}
+                        </div>
+                        {% endif %}
 
                         {% if analysis_result and visual_analysis %}
                         <div class="analysis-result-box">
@@ -118,17 +133,9 @@
                             </div>
 
                             <div class="score-box">
-                                <div class="score-big">4.4</div>
+                                <div class="score-big">{{ average_score }}</div>
                                 <div class="score-text">평균점수</div>
-                                <div class="fresh-big">
-                                    {% if analysis_result.sentiment_result == "긍정" %}
-                                    95%
-                                    {% elif analysis_result.sentiment_result == "부정" %}
-                                    42%
-                                    {% else %}
-                                    70%
-                                    {% endif %}
-                                </div>
+                                <div class="fresh-big">{{ freshness_score }}%</div>
                                 <div class="score-text">신선도 지수</div>
                             </div>
                         </div>
@@ -186,6 +193,31 @@
                         <div class="review-right">
                             <div class="review-rating">★ {{ review.rating }}</div>
                             <button class="helpful-btn">👍 도움돼요 {{ review.helpful }}</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </section>
+                <section class="user-review-section">
+                    <h2>외부 리뷰 <span class="review-count">{{ external_reviews|length }}</span></h2>
+
+                    {% if external_reviews|length == 0 %}
+                    <p>아직 수집된 외부 리뷰가 없습니다.</p>
+                    {% endif %}
+
+                    {% for review in external_reviews %}
+                    <div class="review-card external-review-card">
+                        <div class="review-left">
+                            <div class="avatar">외</div>
+                        </div>
+
+                        <div class="review-center">
+                            <div class="review-name">키노라이츠 리뷰</div>
+                            <div class="review-content">{{ review.review_text }}</div>
+                            <div class="review-date">{{ review.collected_at[:10] }}</div>
+                        </div>
+
+                        <div class="review-right">
+                            <div class="review-rating">외부 데이터</div>
                         </div>
                     </div>
                     {% endfor %}

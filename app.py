@@ -5,7 +5,10 @@ import os
 import random
 import bcrypt
 import json
+from datetime import datetime, timedelta
 
+EXTERNAL_REVIEW_TTL_DAYS = 7
+EXTERNAL_REVIEW_LIMIT = 30
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 RENDER_JAVA_HOME = os.path.join(PROJECT_ROOT, ".jdk")
 
@@ -87,6 +90,29 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             word TEXT UNIQUE NOT NULL,
             count INTEGER DEFAULT 1
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS external_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            movie_id INTEGER NOT NULL,
+            movie_title TEXT NOT NULL,
+            source TEXT NOT NULL,
+            review_text TEXT NOT NULL,
+            rating REAL,
+            collected_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS external_analysis_cache (
+            movie_id INTEGER PRIMARY KEY,
+            movie_title TEXT NOT NULL,
+            source TEXT NOT NULL,
+            analysis_json TEXT NOT NULL,
+            review_count INTEGER DEFAULT 0,
+            collected_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -365,6 +391,19 @@ def analyze_review(content):
         reverse=True
     )[:3]
 
+    senti_result = analyze_review_with_sentiment_dict(content)
+
+    positive_count += senti_result["positive_count"]
+    negative_count += senti_result["negative_count"]
+
+    for item in senti_result["matched_words"]:
+        matched_words.append({
+            "word": item["word"],
+            "category": "감성",
+            "sentiment": "긍정" if item["polarity"] > 0 else "부정",
+            "count": item["count"]
+        })
+
     if positive_count > negative_count:
         sentiment_result = "긍정"
     elif negative_count > positive_count:
@@ -489,6 +528,302 @@ def build_summary_text(analysis_result):
         parts.append(f"{category} 부문에서 [{word_text}]에 대한 언급이 많았습니다")
 
     return "이 영화는 " + ", ".join(parts) + "."
+
+def calculate_score(analysis_result):
+    if not analysis_result:
+        return 0
+
+    positive = analysis_result.get("positive_count", 0)
+    negative = analysis_result.get("negative_count", 0)
+    total = positive + negative
+
+    if total == 0:
+        return 3.0
+
+    score = 3.0 + ((positive - negative) / total) * 2
+    score = max(1.0, min(5.0, score))
+
+    return round(score, 1)
+
+def calculate_freshness(analysis_result):
+    if not analysis_result:
+        return 70
+
+    positive = analysis_result.get("positive_count", 0)
+    negative = analysis_result.get("negative_count", 0)
+    total = positive + negative
+
+    if total == 0:
+        return 70
+
+    freshness = round((positive / total) * 100)
+    freshness = max(30, min(98, freshness))
+
+    return freshness
+
+def get_sample_external_reviews(movie_title):
+    return [
+        f"{movie_title}는 스토리 몰입감이 좋고 연출이 인상적이었다.",
+        f"{movie_title}는 배우들의 연기가 자연스럽고 음악도 잘 어울렸다.",
+        f"{movie_title}는 중반부가 조금 지루했지만 전체적으로 볼만했다.",
+        f"{movie_title}는 스토리 전개가 탄탄하고 몰입감이 뛰어났다.",
+        f"{movie_title}는 연출은 좋았지만 결말이 아쉬웠다.",
+        f"{movie_title}는 음악과 분위기가 좋아서 기억에 남는다.",
+        f"{movie_title}는 배우 연기가 좋아 감정선이 잘 전달됐다.",
+        f"{movie_title}는 약간 지루한 부분도 있었지만 완성도는 좋았다."
+    ]
+
+def collect_kinolights_reviews(movie_title):
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.common.keys import Keys
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        import time
+
+        options = Options()
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1280,1000")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
+
+        driver = webdriver.Chrome(options=options)
+        driver.set_page_load_timeout(8)
+        wait = WebDriverWait(driver, 5)
+
+        driver.get("https://m.kinolights.com/search")
+        print("키노라이츠 검색 페이지 접속 완료")
+        time.sleep(1)
+
+        search_box = wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input"))
+        )
+
+        print("검색창 찾기 성공")
+        search_box.clear()
+        search_box.send_keys(movie_title)
+        search_box.send_keys(Keys.ENTER)
+        time.sleep(2)
+
+        links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/title/']")
+        title_url = ""
+
+        for link in links:
+            href = link.get_attribute("href")
+            text = link.text.strip()
+
+            if href and "/title/" in href:
+                if movie_title.replace(" ", "") in text.replace(" ", ""):
+                    title_url = href
+                    break
+
+        if not title_url and links:
+            title_url = links[0].get_attribute("href")
+
+        if not title_url:
+            driver.quit()
+            return []
+
+        title_id = title_url.split("/title/")[1].split("/")[0].split("?")[0]
+        review_url = f"https://m.kinolights.com/title/{title_id}/reviews"
+
+        driver.get(review_url)
+        print("리뷰 페이지 접속:", review_url)
+        time.sleep(2)
+
+        print("현재 페이지 제목:", driver.title)
+        print("현재 주소:", driver.current_url)
+
+        body_text = driver.find_element(By.TAG_NAME, "body").text
+        print("본문 일부:", body_text[:1000])
+
+        for _ in range(8):
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(1)
+
+        reviews = []
+
+        body_text = driver.find_element(By.TAG_NAME, "body").text
+        lines = [line.strip() for line in body_text.split("\n") if line.strip()]
+
+        reviews = []
+        skip_words = [
+            "공유하기", "더보기", "좋아요", "싫어요",
+            "보고싶어요", "보는중", "봤어요",
+            "작품정보", "영상/이미지", "전체",
+            "인증회원", "팔로잉", "사이트 정보", "저작권",
+            "주메뉴", "홈", "랭킹", "탐색", "혜택",
+            "고객센터", "이용약관", "개인정보", "회사 안내"
+            ]
+
+        for line in lines:
+            clean = " ".join(line.split())
+
+            korean_count = sum(1 for ch in clean if "가" <= ch <= "힣")
+            english_count = sum(1 for ch in clean if ("a" <= ch.lower() <= "z"))
+
+            if korean_count == 0:
+                continue
+
+            if english_count > korean_count:
+                continue
+
+            if len(clean) < 8:
+                continue
+
+            if len(clean) > 120:
+                continue
+
+            if clean == movie_title:
+                continue
+
+            if movie_title in clean and len(clean) < len(movie_title) + 20:
+                continue
+
+            if clean.endswith("%"):
+                continue
+
+            if clean.replace(".", "", 1).isdigit():
+                continue
+
+            if clean.endswith("전"):
+                continue
+
+            if "·" in clean and len(clean) < 30:
+                continue
+
+            if clean.count(" ") == 0 and len(clean) <= 8:
+                continue
+
+            if any(char.isdigit() for char in clean) and len(clean) < 20:
+                continue
+
+            if clean.replace(".", "", 1).isdigit():
+                continue
+
+            if "@" in clean:
+                continue
+
+            if any(word in clean for word in skip_words):
+                continue
+
+            if clean.endswith("전"):
+                continue
+
+            if clean.startswith("[리뷰]"):
+                clean = clean.replace("[리뷰]", "").strip()
+
+            if clean in reviews:
+                continue
+
+            if "_" in clean:
+                continue
+
+            if clean.isdigit():
+                continue
+
+            if clean.count(" ") == 0 and len(clean) <= 8:
+                continue
+
+            try:
+                score = float(clean)
+                if 0 <= score <= 5:
+                    continue
+            except:
+                pass
+
+            reviews.append(clean)
+
+            if len(reviews) >= EXTERNAL_REVIEW_LIMIT:
+                break
+
+
+        if len(reviews) > EXTERNAL_REVIEW_LIMIT:
+            step = max(1, len(reviews) // EXTERNAL_REVIEW_LIMIT)
+            reviews = reviews[::step][:EXTERNAL_REVIEW_LIMIT]
+
+        driver.quit()
+        return reviews
+
+    except Exception as e:
+        print("키노라이츠 리뷰 수집 실패:", type(e).__name__, repr(e))
+        return []
+
+def get_external_analysis(movie_id, movie_title):
+    now = datetime.now()
+
+    conn = get_db()
+
+    reviews = collect_kinolights_reviews(movie_title)
+
+    if len(reviews) == 0:
+        conn.execute("DELETE FROM external_analysis_cache WHERE movie_id = ?", (movie_id,))
+        conn.commit()
+        conn.close()
+
+        return {
+            "analysis_result": None,
+            "visual_analysis": None,
+            "summary_text": "키노라이츠 리뷰 페이지에는 접근했지만, 실제 리뷰 텍스트를 수집하지 못했습니다.",
+            "average_score": 0,
+            "freshness_score": 0,
+            "from_cache": False,
+            "collected_at": now.isoformat(timespec="seconds"),
+            "review_count": 0
+        }
+
+    conn.execute("DELETE FROM external_reviews WHERE movie_id = ?", (movie_id,))
+
+    for review in reviews:
+        conn.execute(
+            "INSERT INTO external_reviews (movie_id, movie_title, source, review_text, rating, collected_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (movie_id, movie_title, "KINOLIGHTS", review, None, now.isoformat(timespec="seconds"))
+        )
+
+    all_text = " ".join(reviews)
+
+    analysis_result = analyze_review(all_text)
+    visual_analysis = build_visual_analysis(analysis_result)
+    summary_text = build_summary_text(analysis_result)
+    average_score = calculate_score(analysis_result)
+    freshness_score = calculate_freshness(analysis_result)
+
+    data = {
+        "analysis_result": analysis_result,
+        "visual_analysis": visual_analysis,
+        "summary_text": summary_text,
+        "average_score": average_score,
+        "freshness_score": freshness_score,
+        "from_cache": False,
+        "collected_at": now.isoformat(timespec="seconds"),
+        "review_count": len(reviews)
+    }
+
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO external_analysis_cache
+        (movie_id, movie_title, source, analysis_json, review_count, collected_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            movie_id,
+            movie_title,
+            "KINOLIGHTS",
+            json.dumps(data, ensure_ascii=False),
+            len(reviews),
+            now.isoformat(timespec="seconds")
+        )
+    )
+
+    conn.commit()
+    conn.close()
+
+    return data
 
 def enrich_dictionary_items(rows):
     items = []
@@ -723,6 +1058,17 @@ def movie_detail(movie_id):
 
     movie = tmdb_get(f"/movie/{movie_id}", {"language": "ko-KR"})
 
+    if not movie:
+        movie = {
+            "id": movie_id,
+            "title": "영화 제목",
+            "poster_path": None,
+            "genres": [],
+            "release_date": "",
+            "vote_average": 0,
+            "overview": "영화 정보를 불러오지 못했습니다."
+        }
+
     conn = get_db()
 
     user_review = conn.execute(
@@ -742,22 +1088,50 @@ def movie_detail(movie_id):
 
     conn.close()
 
+    user_reviews_text = " ".join([row["content"] for row in other_reviews])
+
     analysis_result = None
-    personal_analysis_result = None
     visual_analysis = None
     summary_text = ""
+    average_score = 0
+    freshness_score = 70
+    analysis_source = "none"
+    external_info = None
 
-    all_review_text = " ".join([row["content"] for row in other_reviews])
-
-    if all_review_text:
-        analysis_result = analyze_review(all_review_text)
+    if user_reviews_text:
+        analysis_result = analyze_review(user_reviews_text)
         visual_analysis = build_visual_analysis(analysis_result)
         summary_text = build_summary_text(analysis_result)
+        average_score = calculate_score(analysis_result)
+        freshness_score = calculate_freshness(analysis_result)
+        analysis_source = "user"
+    else:
+        external_info = get_external_analysis(movie_id, movie["title"])
+        analysis_result = external_info["analysis_result"]
+        visual_analysis = external_info["visual_analysis"]
+        summary_text = external_info["summary_text"]
+        average_score = external_info["average_score"]
+        freshness_score = external_info["freshness_score"]
+        analysis_source = "external"
+
+    conn = get_db()
+    external_reviews = conn.execute(
+        """
+        SELECT *
+        FROM external_reviews
+        WHERE movie_id = ?
+        ORDER BY id DESC
+        """,
+        (movie_id,)
+    ).fetchall()
+    conn.close()
+
+    personal_analysis_result = None
 
     if user_review:
         personal_analysis_result = analyze_review(user_review["content"])
 
-        return render_template(
+    return render_template(
         "movie_detail.html",
         analysis_result=analysis_result,
         nickname=get_nickname(),
@@ -769,7 +1143,12 @@ def movie_detail(movie_id):
         favorite=favorite,
         personal_analysis_result=personal_analysis_result,
         visual_analysis=visual_analysis,
-        summary_text=summary_text
+        summary_text=summary_text,
+        average_score=average_score,
+        freshness_score=freshness_score,
+        analysis_source=analysis_source,
+        external_info=external_info,
+        external_reviews=external_reviews
     )
 
 @app.route("/movie/<int:movie_id>/review", methods=["POST"])
