@@ -6,9 +6,12 @@ import random
 import bcrypt
 import json
 from datetime import datetime, timedelta
+import threading
 
 EXTERNAL_REVIEW_TTL_DAYS = 7
 EXTERNAL_REVIEW_LIMIT = 30
+analysis_jobs = {}
+analysis_job_lock = threading.Lock()
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 RENDER_JAVA_HOME = os.path.join(PROJECT_ROOT, ".jdk")
 
@@ -825,6 +828,44 @@ def get_external_analysis(movie_id, movie_title):
 
     return data
 
+def is_external_cache_valid(cached):
+    if not cached:
+        return False
+
+    try:
+        collected_at = datetime.fromisoformat(cached["collected_at"])
+        expire_time = datetime.now() - timedelta(days=EXTERNAL_REVIEW_TTL_DAYS)
+        return collected_at >= expire_time
+    except:
+        return False
+
+def run_external_analysis_job(movie_id, movie_title):
+    try:
+        get_external_analysis(movie_id, movie_title)
+
+        with analysis_job_lock:
+            analysis_jobs[movie_id] = "done"
+
+    except Exception as e:
+        print("백그라운드 외부 리뷰 분석 실패:", e)
+
+        with analysis_job_lock:
+            analysis_jobs[movie_id] = "failed"
+
+def start_external_analysis_job(movie_id, movie_title):
+    with analysis_job_lock:
+        if analysis_jobs.get(movie_id) == "running":
+            return
+
+        analysis_jobs[movie_id] = "running"
+
+    thread = threading.Thread(
+        target=run_external_analysis_job,
+        args=(movie_id, movie_title),
+        daemon=True
+    )
+    thread.start()
+
 def enrich_dictionary_items(rows):
     items = []
     for row in rows:
@@ -1086,6 +1127,11 @@ def movie_detail(movie_id):
         (session["user_id"], movie_id)
     ).fetchone()
 
+    cached = conn.execute(
+        "SELECT * FROM external_analysis_cache WHERE movie_id = ?",
+        (movie_id,)
+    ).fetchone()
+
     conn.close()
 
     user_reviews_text = " ".join([row["content"] for row in other_reviews])
@@ -1105,14 +1151,24 @@ def movie_detail(movie_id):
         average_score = calculate_score(analysis_result)
         freshness_score = calculate_freshness(analysis_result)
         analysis_source = "user"
-    else:
-        external_info = get_external_analysis(movie_id, movie["title"])
+
+    elif is_external_cache_valid(cached):
+        external_info = json.loads(cached["analysis_json"])
+        external_info["from_cache"] = True
+        external_info["collected_at"] = cached["collected_at"]
+        external_info["review_count"] = cached["review_count"]
+
         analysis_result = external_info["analysis_result"]
         visual_analysis = external_info["visual_analysis"]
         summary_text = external_info["summary_text"]
         average_score = external_info["average_score"]
         freshness_score = external_info["freshness_score"]
         analysis_source = "external"
+
+    else:
+        start_external_analysis_job(movie_id, movie["title"])
+        analysis_source = "external_loading"
+        summary_text = "외부 리뷰를 수집하여 분석 중입니다."
 
     conn = get_db()
     external_reviews = conn.execute(
@@ -1150,6 +1206,25 @@ def movie_detail(movie_id):
         external_info=external_info,
         external_reviews=external_reviews
     )
+
+@app.route("/movie/<int:movie_id>/external-status")
+def external_status(movie_id):
+    if not login_required():
+        return jsonify({"status": "unauthorized"})
+
+    status = analysis_jobs.get(movie_id, "none")
+
+    conn = get_db()
+    cached = conn.execute(
+        "SELECT * FROM external_analysis_cache WHERE movie_id = ?",
+        (movie_id,)
+    ).fetchone()
+    conn.close()
+
+    if is_external_cache_valid(cached):
+        status = "done"
+
+    return jsonify({"status": status})
 
 @app.route("/movie/<int:movie_id>/review", methods=["POST"])
 def submit_review(movie_id):

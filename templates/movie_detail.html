@@ -95,6 +95,24 @@
                     <div class="analysis-card">
                         <h3>분석 결과</h3>
                         
+                        {% if analysis_source == "external_loading" %}
+                        <div class="external-analysis-notice">
+                            외부 리뷰를 수집하여 분석 중입니다. 잠시 후 결과가 자동으로 표시됩니다.
+                        </div>
+
+                        <script>
+                        setInterval(function () {
+                            fetch("/movie/{{ movie.id }}/external-status")
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data.status === "done") {
+                                        location.reload();
+                                    }
+                                });
+                        }, 3000);
+                        </script>
+                        {% endif %}
+
                         {% if analysis_source == "external" %}
                         <div class="external-analysis-notice">
                             {% if external_info.review_count > 0 %}
@@ -137,13 +155,17 @@
                                 <div class="score-text">평균점수</div>
                                 <div class="fresh-big">{{ freshness_score }}%</div>
                                 <div class="score-text">신선도 지수</div>
-                            </div>
+                                </div>
                         </div>
-                        {% else %}
-                        <p>아직 분석할 리뷰가 없습니다.</p>
-                        {% endif %}
-                    </div>
 
+                                {% else %}
+                                    {% if analysis_source == "external_loading" %}
+                                    <div class="dashed-box">외부 리뷰 분석이 완료되면 결과가 표시됩니다.</div>
+                                    {% else %}
+                                    <p>아직 분석할 리뷰가 없습니다.</p>
+                                    {% endif %}
+                                {% endif %}
+                        </div>
                     <div class="analysis-card">
                         <h3>종합 요약</h3>
                         <div class="analysis-summary-text">

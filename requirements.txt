@@ -6,3 +6,5 @@ konlpy==0.6.0
 JPype1==1.7.0
 lxml==6.1.0
 numpy==2.4.4
+selenium==4.32.0
+webdriver-manager==4.0.2
